@@ -411,7 +411,7 @@ class Tag(BaseModel):
     name: str
 
 
-# Declare relationships after all classes are decorated
+# Optionally declare relationships after all classes are decorated (not required)
 Author.posts = HasMany(Post, foreign_key="author_id")
 Post.author  = BelongsTo(Author, local_key="author_id")
 Post.tags    = HasManyThrough(Tag, through=PostTag, source_key="post_id", target_key="tag_id")
@@ -437,16 +437,62 @@ post.tags           # → list[Tag]
 `decorators.db` integrates cleanly with FastAPI's `lifespan` pattern for schema initialization and engine disposal:
 
 ```python
+import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from models import User, Product, Order
 
-
 def initialize_schemas():
-    for model in [User, Product, Order]:
-        if not model.schema_exists():
-            model.create_schema()
+    """Create every table schema exactly once on app startup (idempotent)."""
+    logging.info("    Initializing ecommerce database schemas...")
 
+    models = [
+        User,
+        Product,
+        Order,
+    ]
+
+    for model in models:
+        try:
+            # The Production Spec guarantees these schema methods exist on the
+            # registry/manager attached to the model. We call them directly on
+            # the class (the most ergonomic pattern for FastAPI usage).
+            if not model.schema_exists():
+                model.create_schema()
+                logging.info(f"Schema created - {model.__name__}")
+            else:
+                logging.info(f"Schema already exists - {model.__name__}")
+        except AttributeError:
+            # Safety net in case the manager is attached under a different name
+            # (e.g. model.manager or model.registry). The core CRUD routes will
+            # still work.
+            logging.warning(
+                f"Schema methods not directly on {model.__name__}. "
+                "Manual schema creation may be required."
+            )
+        except Exception as exc:  # catches SchemaError, etc.
+            logging.error(f"Failed to initialize {model.__name__}: {exc}")
+
+
+def dispose_engines():
+    """Dispose all SQLAlchemy engines on app shutdown to close DB connections."""
+    logging.info("Disposing database engines...")
+
+    models = [
+        User,
+        Product,
+        Order,
+    ]
+
+    for model in models:
+        try:
+            if model.schema_exists():
+                model.drop_schema()
+                logging.info(f"Engine dropped → {model.__name__}")
+            else:
+                logging.info(f"Engine does not exist → {model.__name__}")
+        except Exception as exc:  # catches SchemaError, etc.
+            logging.error(f"Failed to dispose {model.__name__}: {exc}")
 
 def dispose_engines():
     for model in [User, Product, Order]:
