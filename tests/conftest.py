@@ -4,6 +4,7 @@ import subprocess
 import sys
 import time
 import uuid
+import os
 from pathlib import Path
 
 import pytest
@@ -45,7 +46,7 @@ def _compose_output(*args: str) -> str:
     return "\n".join(part for part in (out, err) if part)
 
 
-def _wait_for_database(url: str, *, timeout_seconds: int = 180) -> None:
+def _wait_for_database(url: str, *, timeout_seconds: int = 240, service_name: str | None = None) -> None:
     deadline = time.time() + timeout_seconds
     last_error: Exception | None = None
 
@@ -62,7 +63,8 @@ def _wait_for_database(url: str, *, timeout_seconds: int = 180) -> None:
             engine.dispose()
 
     ps_output = _compose_output("ps")
-    logs_output = _compose_output("logs", "--tail", "200", "postgres", "mysql")
+    target = [service_name] if service_name else ["postgres", "mysql"]
+    logs_output = _compose_output("logs", "--tail", "200", *target)
     raise RuntimeError(
         f"Database '{url}' was not ready in {timeout_seconds}s: {last_error}\n\n"
         f"docker compose ps:\n{ps_output}\n\n"
@@ -108,8 +110,6 @@ def docker_backends() -> dict[str, str]:
         ) from exc
 
     try:
-        for url in BACKEND_URLS.values():
-            _wait_for_database(url)
         yield BACKEND_URLS
     finally:
         subprocess.run(down_cmd, check=False, capture_output=True, text=True)
@@ -122,6 +122,13 @@ def backend_url(request: pytest.FixtureRequest, docker_backends: dict[str, str])
         raise RuntimeError(
             f"Unknown backend '{backend_name}'. Expected one of: {sorted(docker_backends)}"
         )
+    service_name = "postgres" if backend_name == "postgres" else "mysql"
+    timeout_seconds = int(os.getenv("REGISTER_BACKEND_TIMEOUT_SECONDS", "240"))
+    _wait_for_database(
+        docker_backends[backend_name],
+        timeout_seconds=timeout_seconds,
+        service_name=service_name,
+    )
     return docker_backends[backend_name]
 
 
