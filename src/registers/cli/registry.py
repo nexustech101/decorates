@@ -32,7 +32,7 @@ class CommandEntry:
     handler: Callable[..., Any]
     help_text: str = ""
     description: str = ""
-    ops: tuple[str, ...] = field(default_factory=tuple)
+    options: tuple[str, ...] = field(default_factory=tuple)
 
 
 class CommandRegistry:
@@ -56,7 +56,7 @@ class CommandRegistry:
         *,
         help_text: str = "",
         description: str = "",
-        ops: Sequence[str] | None = None,
+        options: Sequence[str] | None = None,
     ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
         """
         Decorators that registers a callable as a CLI command.
@@ -65,7 +65,7 @@ class CommandRegistry:
             name:      The subcommand name used on the CLI.
             help_text: Short description shown in --help output.
             description: Longer description for docs / help output.
-            ops: Optional command aliases such as ``["-g", "--greet"]``.
+            options: Optional command aliases such as ``["-g", "--greet"]``.
 
         Raises:
             DuplicateCommandError: If *name* is already registered.
@@ -74,7 +74,7 @@ class CommandRegistry:
             raise TypeError("register() missing required argument: 'name'")
 
         summary = description or help_text
-        normalized_ops = tuple(ops or ())
+        normalized_options = tuple(options or ())
 
         def registers(fn: Callable[..., Any]) -> Callable[..., Any]:
             # Check command name collision
@@ -82,11 +82,11 @@ class CommandRegistry:
                 raise DuplicateCommandError(name)
 
             # Check alias collisions
-            for op in normalized_ops:
-                normalized = op.lstrip("-")
+            for option in normalized_options:
+                normalized = option.lstrip("-")
 
                 if normalized in self._commands or normalized in self._aliases:
-                    raise DuplicateCommandError(op)
+                    raise DuplicateCommandError(option)
 
                 self._aliases[normalized] = name
 
@@ -95,7 +95,7 @@ class CommandRegistry:
                 handler=fn,
                 help_text=summary,
                 description=description,
-                ops=normalized_ops,
+                options=normalized_options,
             )
             return fn
 
@@ -144,7 +144,7 @@ class CommandRegistry:
 
         print("Available commands:")
         for entry in self._commands.values():
-            aliases = f" [{', '.join(entry.ops)}]" if entry.ops else ""
+            aliases = f" [{', '.join(entry.options)}]" if entry.options else ""
             summary = entry.help_text or entry.description or "(no description)"
             print(f"  {entry.name}{aliases}: {summary}")
 
@@ -209,9 +209,9 @@ class CommandRegistry:
         first = normalized[0]
         alias_map: dict[str, str] = {}
         for entry in self._commands.values():
-            for op in entry.ops:
-                alias_map[op] = entry.name
-                stripped = op.lstrip("-")
+            for option in entry.options:
+                alias_map[option] = entry.name
+                stripped = option.lstrip("-")
                 if stripped:
                     alias_map[stripped] = entry.name
 

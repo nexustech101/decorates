@@ -89,7 +89,7 @@ cli = CommandRegistry()
 
 
 @cli.register(
-    ops=["-g", "--greet"],
+    options=["-g", "--greet"],
     name="greet",
     description="Greet someone by name",
 )
@@ -138,11 +138,11 @@ python app.py create-report "Q3 Summary" 12 --verbose --output ./reports
 
 ### Command Aliases
 
-The `ops` field registers shorthand and flag-style aliases alongside the canonical command name. All three forms are resolved automatically:
+The `options` field registers shorthand and flag-style aliases alongside the canonical command name. All three forms are resolved automatically:
 
 ```python
 @cli.register(
-    ops=["-s", "--sync"],
+    options=["-s", "--sync"],
     name="sync",
     description="Sync the database",
 )

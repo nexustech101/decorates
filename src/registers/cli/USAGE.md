@@ -18,7 +18,7 @@ cli = CommandRegistry()
 
 
 @cli.register(
-    ops=["-g", "--greet"],
+    options=["-g", "--greet"],
     name="greet",
     description="Greet someone by name",
 )
@@ -56,7 +56,7 @@ Each decorated function becomes a subcli.
 
 ```python
 @cli.register(
-    ops=["-a", "--add"],
+    options=["-a", "--add"],
     name="add",
     description="Add two integers",
 )
@@ -90,12 +90,12 @@ result = cli.run(["add", "2", "3"], print_result=False)
 assert result == "5"
 ```
 
-## About `ops`
+## About `options`
 
-The `ops` field lets you define cli aliases in a compact style:
+The `options` field lets you define cli aliases in a compact style:
 
 ```python
-ops=["-g", "--greet"]
+options=["-g", "--greet"]
 ```
 
 With that metadata, all of these forms work:
@@ -144,7 +144,7 @@ Usage:
 
 ```python
 @cli.register(
-    ops=["-m", "--multiply"],
+    options=["-m", "--multiply"],
     name="multiply",
     description="Multiply two integers",
 )
@@ -159,7 +159,7 @@ For lightweight scripts, you can expose a built-in registry view:
 
 ```python
 @cli.register(
-    ops=["-l", "--list"],
+    options=["-l", "--list"],
     name="list",
     description="List all registered clis",
 )

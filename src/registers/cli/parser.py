@@ -160,17 +160,17 @@ def _command_aliases(entry: Any) -> list[str]:
     """
     Convert metadata aliases into argparse subcommand aliases.
 
-    ``ops`` entries like ``-g`` and ``--greet`` are normalized to ``g``
+    ``options`` entries like ``-g`` and ``--greet`` are normalized to ``g``
     and ``greet`` for argparse, while ``registry.run()`` still accepts
     the original flag-style tokens.
     """
     aliases: list[str] = []
-    for op in getattr(entry, "ops", ()):
+    for op in getattr(entry, "options", ()):
         aliases.append(op.lstrip("-"))
     return aliases
 
 
 def _format_help(entry: Any) -> str:
-    """Include original ops in help output (fixes test expectations)."""
-    ops = " ".join(entry.ops) if entry.ops else ""
-    return f"{entry.help_text} {ops}".strip()
+    """Include original options in help output (fixes test expectations)."""
+    options = " ".join(entry.options) if entry.options else ""
+    return f"{entry.help_text} {options}".strip()

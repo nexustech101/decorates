@@ -88,10 +88,10 @@ class TestCommandRegistry:
         reg.register("one")(lambda: None)
         assert len(reg) == 1
 
-    def test_register_supports_description_and_ops(self):
+    def test_register_supports_description_and_options(self):
         reg = CommandRegistry()
 
-        @reg.register(name="greet", description="Say hello", ops=["-g", "--greet"])
+        @reg.register(name="greet", description="Say hello", options=["-g", "--greet"])
         def greet(name: str) -> str:
             return f"hi {name}"
 
@@ -99,12 +99,12 @@ class TestCommandRegistry:
         assert entry.handler is greet
         assert entry.help_text == "Say hello"
         assert entry.description == "Say hello"
-        assert entry.ops == ("-g", "--greet")
+        assert entry.options == ("-g", "--greet")
 
     def test_run_maps_flag_style_alias_to_command_name(self):
         reg = CommandRegistry()
 
-        @reg.register(name="greet", description="Say hello", ops=["-g", "--greet"])
+        @reg.register(name="greet", description="Say hello", options=["-g", "--greet"])
         def greet(name: str) -> str:
             return f"hi {name}"
 
@@ -113,7 +113,7 @@ class TestCommandRegistry:
     def test_run_maps_stripped_alias_to_command_name(self):
         reg = CommandRegistry()
 
-        @reg.register(name="greet", description="Say hello", ops=["-g", "--greet"])
+        @reg.register(name="greet", description="Say hello", options=["-g", "--greet"])
         def greet(name: str) -> str:
             return f"hi {name}"
 
@@ -121,7 +121,7 @@ class TestCommandRegistry:
 
     def test_list_commands_prints_aliases(self, capsys):
         reg = CommandRegistry()
-        reg.register(name="greet", description="Say hello", ops=["-g", "--greet"])(lambda: None)
+        reg.register(name="greet", description="Say hello", options=["-g", "--greet"])(lambda: None)
         reg.list_commands()
         out = capsys.readouterr().out
         assert "greet" in out
@@ -314,7 +314,7 @@ class TestParser:
 
     def test_subcommand_aliases(self):
         reg = CommandRegistry()
-        reg.register(name="greet", description="Say hi", ops=["-g", "--hello"])(lambda name: None)
+        reg.register(name="greet", description="Say hi", options=["-g", "--hello"])(lambda name: None)
         parser = build_parser(reg)
         ns = parser.parse_args(["hello", "Alice"])
         assert ns.command == "hello"

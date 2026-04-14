@@ -29,10 +29,10 @@ def test_duplicate_command_names():
 
 def test_alias_collision_across_commands():
     reg = CommandRegistry()
-    reg.register(name="sync", ops=["-s"])(lambda: None)
+    reg.register(name="sync", options=["-s"])(lambda: None)
 
     with pytest.raises(DuplicateCommandError):
-        reg.register(name="status", ops=["-s"])(lambda: None)
+        reg.register(name="status", options=["-s"])(lambda: None)
 
 
 def test_alias_collision_with_command_name():
@@ -40,7 +40,7 @@ def test_alias_collision_with_command_name():
     reg.register(name="sync")(lambda: None)
 
     with pytest.raises(DuplicateCommandError):
-        reg.register(name="status", ops=["sync"])(lambda: None)
+        reg.register(name="status", options=["sync"])(lambda: None)
 
 
 # --------------------------------------------------
@@ -329,7 +329,7 @@ async def test_async_command():
 def test_help_output(capsys):
     reg = CommandRegistry()
 
-    @reg.register(name="greet", description="Say hello", ops=["-g"])
+    @reg.register(name="greet", description="Say hello", options=["-g"])
     def greet(name: str):
         pass
 
