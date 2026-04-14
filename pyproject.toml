@@ -5,10 +5,23 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "decorators"
 version = "0.3.0"
-description = "Decorator-driven persistence registry for Pydantic models and cli tooling"
-readme = "decorators/USAGE.md"
+description = "Decorator-driven persistence registry for Pydantic models and CLI tooling"
+readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.10"
 license = { text = "MIT" }
+
+authors = [
+    { name = "Charles DeFreese" }
+]
+
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
 
 dependencies = [
     "pydantic>=2.0",
@@ -22,13 +35,13 @@ dev = [
 ]
 
 [tool.pytest.ini_options]
-testpaths = [
-    "decorators/cli/tests",
-    "decorators/db/tests",
-]
+testpaths = ["tests"]
 addopts = "-v --tb=short"
-pythonpath = ["."]
 
 [tool.setuptools.packages.find]
-where = ["."]
+where = ["src"]
 include = ["decorators*"]
+exclude = ["*.tests*", "*.tests.*"]
+
+[tool.setuptools]
+package-dir = {"" = "src"}

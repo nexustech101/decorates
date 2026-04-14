@@ -3,7 +3,7 @@ name: Publish to PyPI
 on:
   push:
     tags:
-      - "v*"   # triggers on version tags like v1.0.0
+      - "v*"
   release:
     types: [published]
 
@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
 
     permissions:
-      id-token: write   # REQUIRED for trusted publishing
+      id-token: write
       contents: read
 
     steps:
@@ -24,25 +24,27 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install build tools
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install build
+          pip install build pytest
+
+      - name: Run tests (source)
+        run: pytest
 
       - name: Build package
         run: python -m build
 
       - name: Verify build artifacts
         run: |
-          ls -la dist/
           pip install twine
           twine check dist/*
 
+      - name: Install built package
+        run: pip install dist/*.whl
+
+      - name: Run tests (installed package)
+        run: pytest
+
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
-
-      - name: Install package
-        run: pip install .
-
-      - name: Run tests
-        run: pytest
