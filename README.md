@@ -1,4 +1,4 @@
-# Framework
+# Decorates
 
 Decorator-driven tooling for Python:
 
