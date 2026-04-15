@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from sqlalchemy import create_mock_engine
 
-from framework.db.schema import _build_rename_table_sql
+from decorates.db.schema import _build_rename_table_sql
 
 
 def test_mysql_rename_table_sql_uses_mysql_syntax_and_quoting():

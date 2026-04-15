@@ -1,6 +1,6 @@
-# Building CLI Tools With `framework.cli`
+# Building CLI Tools With `decorates.cli`
 
-`framework.cli` is a lightweight decorator-based framework for building command-line tools from ordinary Python functions.
+`decorates.cli` is a lightweight decorator-based decorates for building command-line tools from ordinary Python functions.
 It is backed by a robust automated test suite and designed for production-grade diagnostics through clear exceptions and logging.
 
 It supports two usage styles:
@@ -13,7 +13,7 @@ This guide focuses on the second style, because it is the fastest way to build a
 ## Quick Start
 
 ```python
-from framework.cli import CommandRegistry
+from decorates.cli import CommandRegistry
 
 cli = CommandRegistry()
 
@@ -46,12 +46,12 @@ python test.py g Alice
 The registry stores cli metadata and handler functions.
 
 ```python
-from framework.cli import CommandRegistry
+from decorates.cli import CommandRegistry
 
 cli = CommandRegistry()
 ```
 
-### 2. Register clis with framework
+### 2. Register clis with decorates
 
 Each decorated function becomes a subcli.
 
@@ -111,11 +111,11 @@ The canonical cli name is still the `name=` value.
 
 ## Standardized Error Handling
 
-The framework keeps error handling predictable:
+The decorates keeps error handling predictable:
 
-- framework-level issues (`UnknownCommandError`, `DependencyNotFoundError`, etc.) are raised directly
+- decorates-level issues (`UnknownCommandError`, `DependencyNotFoundError`, etc.) are raised directly
 - unexpected command-handler failures invoked through `registry.run()` are wrapped as `CommandExecutionError` with the original exception chained
-- logs are emitted via `framework.cli.*` loggers so applications can route them centrally
+- logs are emitted via `decorates.cli.*` loggers so applications can route them centrally
 
 You can still add app-level wrappers/policies as needed:
 
@@ -187,10 +187,10 @@ def list_clis() -> None:
 
 ## Dependency Injection
 
-For larger apps, `framework.cli` still supports the lower-level DI container and dispatcher flow.
+For larger apps, `decorates.cli` still supports the lower-level DI container and dispatcher flow.
 
 ```python
-from framework.cli import CommandRegistry, DIContainer, Dispatcher, build_parser
+from decorates.cli import CommandRegistry, DIContainer, Dispatcher, build_parser
 
 registry = CommandRegistry()
 container = DIContainer()

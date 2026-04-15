@@ -1,6 +1,6 @@
 """
 The CommandRegistry stores command metadata and provides the @register
-framework. It is intentionally decoupled from argparse and dispatching —
+decorates. It is intentionally decoupled from argparse and dispatching —
 it only knows about *what* commands exist, not *how* to invoke them.
 
 Usage::
@@ -19,7 +19,7 @@ from difflib import get_close_matches
 import logging
 from typing import TYPE_CHECKING, Any, Callable, Sequence
 
-from framework.cli.exceptions import (
+from decorates.cli.exceptions import (
     CommandExecutionError,
     DuplicateCommandError,
     FrameworkError,
@@ -27,15 +27,15 @@ from framework.cli.exceptions import (
 )
 
 if TYPE_CHECKING:
-    from framework.cli.middleware import MiddlewareChain
-    from framework.cli.container import DIContainer
+    from decorates.cli.middleware import MiddlewareChain
+    from decorates.cli.container import DIContainer
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass
 class CommandEntry:
-    """All metadata the framework needs for a single command."""
+    """All metadata the decorates needs for a single command."""
     name: str
     handler: Callable[..., Any]
     help_text: str = ""
@@ -67,7 +67,7 @@ class CommandRegistry:
         options: Sequence[str] | None = None,
     ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
         """
-        Decorators that framework a callable as a CLI command.
+        Decorators that decorates a callable as a CLI command.
 
         Args:
             name:      The subcommand name used on the CLI.
@@ -84,7 +84,7 @@ class CommandRegistry:
         summary = description or help_text
         normalized_options = tuple(options or ())
 
-        def framework(fn: Callable[..., Any]) -> Callable[..., Any]:
+        def decorates(fn: Callable[..., Any]) -> Callable[..., Any]:
             # Check command name collision
             if name in self._commands or name in self._aliases:
                 logger.warning("Attempted duplicate command registration name='%s'.", name)
@@ -113,7 +113,7 @@ class CommandRegistry:
             )
             return fn
 
-        return framework
+        return decorates
 
     # ------------------------------------------------------------------
     # Lookup
@@ -183,9 +183,9 @@ class CommandRegistry:
         """
         import sys
 
-        from framework.cli.dispatcher import Dispatcher
-        from framework.cli.parser import build_parser
-        from framework.cli.container import DIContainer
+        from decorates.cli.dispatcher import Dispatcher
+        from decorates.cli.parser import build_parser
+        from decorates.cli.container import DIContainer
 
         parser = build_parser(self, container)
         raw_argv = list(sys.argv[1:] if argv is None else argv)

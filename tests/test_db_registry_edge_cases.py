@@ -14,7 +14,7 @@ from sqlalchemy import inspect, text
 
 from conftest import db_url
 
-from framework.db import (
+from decorates.db import (
     HasManyThrough,
     ImmutableFieldError,
     InvalidQueryError,

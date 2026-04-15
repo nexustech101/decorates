@@ -1,9 +1,9 @@
 """
-A lightweight, framework-based CLI framework.
+A lightweight, decorates-based CLI decorates.
 
 Public API surface::
 
-    from framework.cli import (
+    from decorates.cli import (
         CommandRegistry,
         DIContainer,
         MiddlewareChain,
@@ -16,15 +16,15 @@ Public API surface::
     )
 """
 
-from framework.cli.dispatcher import Dispatcher
-from framework.cli.middleware import (
+from decorates.cli.dispatcher import Dispatcher
+from decorates.cli.middleware import (
     MiddlewareChain,
     logging_middleware_post,
     logging_middleware_pre,
 )
-from framework.cli.parser import build_parser
-from framework.cli.container import DIContainer
-from framework.cli.exceptions import (
+from decorates.cli.parser import build_parser
+from decorates.cli.container import DIContainer
+from decorates.cli.exceptions import (
     CommandExecutionError,
     DependencyNotFoundError,
     DuplicateCommandError,
@@ -32,11 +32,11 @@ from framework.cli.exceptions import (
     PluginLoadError,
     UnknownCommandError,
 )
-from framework.cli.registry import CommandRegistry
-from framework.cli.plugins import load_plugins
+from decorates.cli.registry import CommandRegistry
+from decorates.cli.plugins import load_plugins
 
 __all__ = [
-    # Core framework
+    # Core decorates
     "CommandRegistry",
     "DIContainer",
     "Dispatcher",

@@ -44,8 +44,8 @@ from sqlalchemy import Column, MetaData, Table, delete, func, inspect, select, u
 from sqlalchemy.engine import Connection
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
-from framework.db.engine import dialect_insert, dispose_engine, get_engine
-from framework.db.exceptions import (
+from decorates.db.engine import dialect_insert, dispose_engine, get_engine
+from decorates.db.exceptions import (
     DuplicateKeyError,
     ImmutableFieldError,
     InvalidPrimaryKeyAssignmentError,
@@ -55,11 +55,11 @@ from framework.db.exceptions import (
     SchemaError,
     UniqueConstraintError,
 )
-from framework.db.metadata import RegistryConfig
-from framework.db.operators import VALID_OPERATORS, is_iterable_value, parse_criterion, split_field_expr
-from framework.db.schema import SchemaManager
-from framework.db.security import hash_password, is_password_hash
-from framework.db.typing_utils import (
+from decorates.db.metadata import RegistryConfig
+from decorates.db.operators import VALID_OPERATORS, is_iterable_value, parse_criterion, split_field_expr
+from decorates.db.schema import SchemaManager
+from decorates.db.security import hash_password, is_password_hash
+from decorates.db.typing_utils import (
     default_database_url,
     default_table_name,
     field_allows_none,
@@ -68,7 +68,7 @@ from framework.db.typing_utils import (
 )
 
 ModelT = TypeVar("ModelT", bound=BaseModel)
-_ORIGINAL_KEY_ATTR = "__framework_original_key__"
+_ORIGINAL_KEY_ATTR = "__decorates_original_key__"
 _PASSWORD_FIELD = "password"
 logger = logging.getLogger(__name__)
 

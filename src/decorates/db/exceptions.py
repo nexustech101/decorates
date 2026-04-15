@@ -21,7 +21,7 @@ from typing import Any
 
 
 class RegistryError(Exception):
-    """Base class for all framework.db exceptions with optional structured context."""
+    """Base class for all decorates.db exceptions with optional structured context."""
 
     def __init__(
         self,

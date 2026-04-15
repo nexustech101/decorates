@@ -15,7 +15,7 @@ jobs:
       contents: read
 
     steps:
-      - name: Checkout framework
+      - name: Checkout decorates
         uses: actions/checkout@v4
 
       - name: Set up Python

@@ -1,7 +1,7 @@
 """
 Builds an ``argparse.ArgumentParser`` from a :class:`CommandRegistry`.
 
-All knowledge of argparse lives here. The rest of the framework never
+All knowledge of argparse lives here. The rest of the decorates never
 imports argparse directly. This keeps the parser easily swappable and
 the dispatcher clean.
 """
@@ -13,12 +13,12 @@ import inspect
 import logging
 from typing import TYPE_CHECKING, Any, get_origin, get_args, Literal
 
-from framework.cli.registry import CommandRegistry
-from framework.cli.utils.reflection import get_params
-from framework.cli.utils.typing import is_bool_flag, is_optional, resolve_argparse_type
+from decorates.cli.registry import CommandRegistry
+from decorates.cli.utils.reflection import get_params
+from decorates.cli.utils.typing import is_bool_flag, is_optional, resolve_argparse_type
 
 if TYPE_CHECKING:
-    from framework.cli.container import DIContainer
+    from decorates.cli.container import DIContainer
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +71,7 @@ def build_parser(
     * required primitive    → positional argument
     """
     parser = SuggestingArgumentParser(
-        description="Built with framework.cli",
+        description="Built with decorates.cli",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
 

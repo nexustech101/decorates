@@ -3,8 +3,8 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "framework"
-version = "3.0.1"
+name = "decorates"
+version = "3.1.1"
 description = "Decorator-driven persistence registry for Pydantic models and CLI tooling"
 readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.10"
@@ -38,8 +38,8 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/nexustech101/framework"
-Repository = "https://github.com/nexustech101/framework"
+Homepage = "https://github.com/nexustech101/decorates"
+Repository = "https://github.com/nexustech101/decorates"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -48,11 +48,11 @@ asyncio_mode = "auto"
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["framework*"]
+include = ["decorates*"]
 exclude = ["*.tests*", "*.tests.*"]
 
 [tool.setuptools]
 package-dir = {"" = "src"}  # Container for package modules
 
 [tool.setuptools.package-data]
-framework = ["py.typed"]
+decorates = ["py.typed"]

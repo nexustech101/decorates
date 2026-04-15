@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from sqlalchemy.exc import SQLAlchemyError
 
 from conftest import db_url
-from framework.db import SchemaError, database_registry
+from decorates.db import SchemaError, database_registry
 
 
 class TestDbErrorHandling:

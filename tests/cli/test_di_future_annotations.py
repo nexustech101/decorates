@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from framework.cli import CommandRegistry, DIContainer, Dispatcher
-from framework.cli.parser import build_parser
+from decorates.cli import CommandRegistry, DIContainer, Dispatcher
+from decorates.cli.parser import build_parser
 
 
 class GreeterService:

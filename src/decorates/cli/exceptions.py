@@ -1,6 +1,6 @@
 """
-All framework-level exceptions in one place. Application code can catch
-these without importing from deeper framework modules.
+All decorates-level exceptions in one place. Application code can catch
+these without importing from deeper decorates modules.
 """
 
 from __future__ import annotations
@@ -9,7 +9,7 @@ from typing import Any
 
 
 class FrameworkError(Exception):
-    """Base class for all framework errors."""
+    """Base class for all decorates errors."""
 
 
 class DuplicateCommandError(FrameworkError):

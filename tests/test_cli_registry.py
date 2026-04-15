@@ -1,24 +1,24 @@
 """
 tests/unit/test_py
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Unit tests for the framework layer. Each module is tested in isolation
+Unit tests for the decorates layer. Each module is tested in isolation
 with no real filesystem or subprocess involvement.
 """
 
 import pytest
 
-from framework.cli.registry import CommandRegistry
-from framework.cli.container import DIContainer
-from framework.cli.exceptions import (
+from decorates.cli.registry import CommandRegistry
+from decorates.cli.container import DIContainer
+from decorates.cli.exceptions import (
     DuplicateCommandError,
     UnknownCommandError,
     DependencyNotFoundError,
 )
-from framework.cli.dispatcher import Dispatcher
-from framework.cli.parser import build_parser
-from framework.cli.middleware import MiddlewareChain
-from framework.cli.utils.typing import resolve_argparse_type, is_bool_flag, is_optional
-from framework.cli.utils.reflection import get_params
+from decorates.cli.dispatcher import Dispatcher
+from decorates.cli.parser import build_parser
+from decorates.cli.middleware import MiddlewareChain
+from decorates.cli.utils.typing import resolve_argparse_type, is_bool_flag, is_optional
+from decorates.cli.utils.reflection import get_params
 from typing import Optional
 
 

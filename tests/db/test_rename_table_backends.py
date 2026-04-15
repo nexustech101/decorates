@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from sqlalchemy import inspect
 
 from conftest import backend_table_name
-from framework.db import MigrationError, database_registry
+from decorates.db import MigrationError, database_registry
 
 
 @pytest.mark.parametrize("backend_url", ["postgres", "mysql"], indirect=True)

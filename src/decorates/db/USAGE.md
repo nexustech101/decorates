@@ -1,6 +1,6 @@
-# framework.db Usage
+# decorates.db Usage
 
-`framework.db` is a lightweight persistence layer for Pydantic models built on SQLAlchemy.
+`decorates.db` is a lightweight persistence layer for Pydantic models built on SQLAlchemy.
 The goal is simple: decorate a model, then use `Model.objects` for CRUD.
 The module is covered by a robust test suite and hardened for production-grade error reporting.
 
@@ -9,14 +9,14 @@ This guide is designed to get you productive in about 10 minutes.
 ## Install
 
 ```bash
-pip install framework
+pip install decorates
 ```
 
 ## 1. Quick Start
 
 ```python
 from pydantic import BaseModel
-from framework.db import database_registry
+from decorates.db import database_registry
 
 
 @database_registry(
@@ -199,7 +199,7 @@ Relationships are descriptors assigned after model decoration.
 
 ```python
 from pydantic import BaseModel
-from framework.db import database_registry, HasMany, BelongsTo, HasManyThrough
+from decorates.db import database_registry, HasMany, BelongsTo, HasManyThrough
 
 DB = "sqlite:///app.db"
 
@@ -259,7 +259,7 @@ with User.objects.transaction():
 Dispose connection pools at shutdown:
 
 ```python
-from framework.db import dispose_all
+from decorates.db import dispose_all
 
 dispose_all()
 ```
@@ -297,5 +297,5 @@ All inherit from `RegistryError`.
 Operational note:
 
 - unexpected SQLAlchemy runtime failures are normalized into `SchemaError` with operation context
-- logs are emitted under `framework.db.*` so production logging/observability pipelines can capture failures cleanly
+- logs are emitted under `decorates.db.*` so production logging/observability pipelines can capture failures cleanly
 - all DB exceptions expose structured metadata via `exc.context` and `exc.to_dict()` for richer diagnostics

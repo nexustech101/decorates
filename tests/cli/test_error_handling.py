@@ -4,7 +4,7 @@ import logging
 
 import pytest
 
-from framework.cli import CommandRegistry, CommandExecutionError, DependencyNotFoundError, Dispatcher, DIContainer
+from decorates.cli import CommandRegistry, CommandExecutionError, DependencyNotFoundError, Dispatcher, DIContainer
 
 
 class Service:
@@ -22,7 +22,7 @@ class TestCliErrorHandling:
         with pytest.raises(CommandExecutionError, match="Command 'boom' failed: boom"):
             reg.run(["boom"], print_result=False)
 
-    def test_run_preserves_framework_errors(self):
+    def test_run_preserves_decorates_errors(self):
         reg = CommandRegistry()
 
         @reg.register(name="needs_dep")

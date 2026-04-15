@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from sqlalchemy import inspect
 
 from conftest import db_url
-from framework.db import MigrationError, database_registry
+from decorates.db import MigrationError, database_registry
 
 
 class TestRenameTableStateSync:

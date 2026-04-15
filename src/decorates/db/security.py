@@ -1,7 +1,7 @@
 """
 Password helpers for registry-managed models.
 
-The framework intentionally uses only the Python standard library here so
+The decorates intentionally uses only the Python standard library here so
 password hashing stays available without pulling in another runtime
 dependency.
 """

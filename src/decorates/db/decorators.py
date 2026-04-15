@@ -65,10 +65,10 @@ from typing import Any, Callable, TypeVar
 
 from pydantic import BaseModel
 
-from framework.db.exceptions import ModelRegistrationError
-from framework.db.registry import DatabaseRegistry
-from framework.db.security import verify_password as verify_password_value
-from framework.db.typing_utils import annotation_is_integer, field_allows_none
+from decorates.db.exceptions import ModelRegistrationError
+from decorates.db.registry import DatabaseRegistry
+from decorates.db.security import verify_password as verify_password_value
+from decorates.db.typing_utils import annotation_is_integer, field_allows_none
 
 ModelT = TypeVar("ModelT", bound=BaseModel)
 logger = logging.getLogger(__name__)

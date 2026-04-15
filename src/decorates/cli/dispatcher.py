@@ -13,11 +13,11 @@ import inspect
 import logging
 from typing import Any
 
-from framework.cli.exceptions import DependencyNotFoundError, FrameworkError
-from framework.cli.middleware import MiddlewareChain
-from framework.cli.container import DIContainer
-from framework.cli.registry import CommandRegistry
-from framework.cli.utils.reflection import get_params
+from decorates.cli.exceptions import DependencyNotFoundError, FrameworkError
+from decorates.cli.middleware import MiddlewareChain
+from decorates.cli.container import DIContainer
+from decorates.cli.registry import CommandRegistry
+from decorates.cli.utils.reflection import get_params
 
 logger = logging.getLogger(__name__)
 

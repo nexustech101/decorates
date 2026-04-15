@@ -2,15 +2,15 @@
 
 Decorator-driven tooling for Python:
 
-- `framework.cli` for ergonomic command-line apps
-- `framework.db` for Pydantic + SQLAlchemy persistence
+- `decorates.cli` for ergonomic command-line apps
+- `decorates.db` for Pydantic + SQLAlchemy persistence
 
 The philosophy is simple: minimal setup, predictable behavior, and a fast path to shipping.
 
 ## Install
 
 ```bash
-pip install framework
+pip install decorates
 ```
 
 ## Quick Start Guide
@@ -22,7 +22,7 @@ pip install framework
 ### CLI in 60 seconds
 
 ```python
-from framework.cli import CommandRegistry
+from decorates.cli import CommandRegistry
 
 cli = CommandRegistry()
 
@@ -73,7 +73,7 @@ Available commands:
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from framework.db import (
+from decorates.db import (
     RecordNotFoundError,
     UniqueConstraintError,
     database_registry,
@@ -184,26 +184,26 @@ def list_orders_asc(limit: int = 20, offset: int = 0):  # Filter by newest  (n..
 
 ## Core Concepts
 
-### `framework.cli`
+### `decorates.cli`
 
 - Register functions as commands with `@cli.register(...)`.
 - Type annotations drive argument parsing.
 - Optional command aliases with `options=["-x", "--long"]`.
 - Optional DI (`DIContainer`) and middleware (`MiddlewareChain`).
-- `CommandRegistry.run()` preserves framework exceptions and wraps unexpected handler crashes as `CommandExecutionError` (with original exception chaining).
-- Operational logs use standard Python logging namespaces under `framework.cli.*`.
+- `CommandRegistry.run()` preserves decorates exceptions and wraps unexpected handler crashes as `CommandExecutionError` (with original exception chaining).
+- Operational logs use standard Python logging namespaces under `decorates.cli.*`.
 
-### `framework.db`
+### `decorates.db`
 
 - Register `BaseModel` classes with `@database_registry(...)`.
 - Access all persistence through `Model.objects`.
 - `id: int | None = None` gives database-managed autoincrement IDs.
 - Schema helpers are available as class methods: `create_schema`, `drop_schema`, `schema_exists`, `truncate`.
 - Unexpected SQLAlchemy runtime failures are normalized into `SchemaError` for cleaner, predictable error handling.
-- Operational logs use standard Python logging namespaces under `framework.db.*`.
+- Operational logs use standard Python logging namespaces under `decorates.db.*`.
 - DB exceptions provide structured metadata (`exc.context`, `exc.to_dict()`) for production diagnostics.
 
-## `framework.db` Usage Snapshot
+## `decorates.db` Usage Snapshot
 
 ```python
 # Filtering operators
@@ -230,9 +230,9 @@ If your model contains a field named `password`, password values are automatical
 
 ## Documentation
 
-- DB guide: `src/framework/db/USAGE.md`
-- CLI source API: `src/framework/cli`
-- DB source API: `src/framework/db`
+- DB guide: `src/decorates/db/USAGE.md`
+- CLI source API: `src/decorates/cli`
+- DB source API: `src/decorates/db`
 
 ## Requirements
 
@@ -245,7 +245,7 @@ If your model contains a field named `password`, password values are automatical
 - Default `pytest` includes SQLite plus PostgreSQL/MySQL rename-state integration tests.
 - Start Docker Desktop (or another Docker engine) before running tests so
   `docker-compose.test-db.yml` services can boot.
-- The framework is backed by a rigorous, production-focused test suite (170+ tests) that covers unit, edge-case, and multi-dialect integration behavior.
+- The decorates is backed by a rigorous, production-focused test suite (170+ tests) that covers unit, edge-case, and multi-dialect integration behavior.
 
 ## License
 
