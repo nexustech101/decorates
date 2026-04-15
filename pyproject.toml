@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "framework"
-version = "3.0.0"
+version = "3.0.1"
 description = "Decorator-driven persistence registry for Pydantic models and CLI tooling"
 readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.10"
