@@ -1,10 +1,10 @@
 # Decorates
 
-[![PyPI version](https://img.shields.io/pypi/v/functionals)](https://pypi.org/project/functionals/)
-[![Python versions](https://img.shields.io/pypi/pyversions/functionals)](https://pypi.org/project/functionals/)
+[![PyPI version](https://img.shields.io/pypi/v/decorates)](https://pypi.org/project/decorates/)
+[![Python versions](https://img.shields.io/pypi/pyversions/decorates)](https://pypi.org/project/decorates/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![CLI](https://img.shields.io/badge/module-functionals.cli-blue)](#functionalscli)
-[![DB](https://img.shields.io/badge/module-functionals.db-darkgreen)](#functionalsdb)
+[![CLI](https://img.shields.io/badge/module-functionals.cli-blue)](#decoratescli)
+[![DB](https://img.shields.io/badge/module-functionals.db-darkorange)](#decoratesdb)
 [![Tests](https://img.shields.io/badge/tested-170%2B%20tests-brightgreen)](#testing)
 
 Decorates is a production-oriented toolkit for two common Python surfaces:
@@ -229,12 +229,11 @@ If your model contains a field named `password`, password values are automatical
 
 ## Testing
 
-- Default `pytest` includes SQLite plus PostgreSQL/MySQL rename-state integration tests.
-- Start Docker Desktop (or another Docker engine) before running tests so
-  `docker-compose.test-db.yml` services can boot.
-- The functionals is backed by a rigorous, production-focused test suite (170+ tests) that covers unit, edge-case, and multi-dialect integration behavior.
+- The default `pytest` suite includes SQLite coverage along with PostgreSQL/MySQL integration tests for rename-state behavior.
+- Run Docker Desktop, or another compatible Docker engine, before executing the backend integration suite so the services in `docker-compose.test-db.yml` can boot successfully.
+- The package is backed by a rigorous, production-focused test suite (170+ tests) covering unit behavior, edge cases, and multi-dialect integration scenarios.
+
 
 ## License
 
 MIT
-
