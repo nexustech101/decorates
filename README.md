@@ -1,4 +1,4 @@
-# Decorates
+# Functionals
 
 [![PyPI version](https://img.shields.io/pypi/v/decorates)](https://pypi.org/project/decorates/)
 [![Python versions](https://img.shields.io/pypi/pyversions/decorates)](https://pypi.org/project/decorates/)
