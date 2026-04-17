@@ -10,7 +10,9 @@ import inspect
 import logging
 import os
 from pathlib import Path
+import re
 import shlex
+import subprocess
 import sys
 from typing import Any, get_args, get_origin
 
@@ -19,6 +21,22 @@ from functionals.cli.parser import ParseError, parse_command_args, render_comman
 from functionals.cli.registry import HELP_ALIASES, MISSING
 
 logger = logging.getLogger(__name__)
+
+try:
+    import readline as _readline  # noqa: F401
+except Exception:  # pragma: no cover - platform-dependent
+    _READLINE_AVAILABLE = False
+else:
+    _READLINE_AVAILABLE = True
+
+
+# Mark non-printing spans for GNU readline prompt-length accounting.
+_READLINE_NONPRINT_START = "\001"
+_READLINE_NONPRINT_END = "\002"
+
+# ANSI SGR escapes for coloring and generic CSI escapes (e.g. arrow keys).
+_ANSI_ESCAPE = re.compile(r"\033\[[0-9;]*m")
+_CSI_ESCAPE = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]")
 
 
 # ---------------------------------------------------------------------------
@@ -56,6 +74,10 @@ def _supports_color() -> bool:
     except Exception:
         return False
     return tty and os.getenv("TERM", "").lower() != "dumb" and _enable_windows_ansi()
+
+
+def _is_windows() -> bool:
+    return os.name == "nt"
 
 
 # ---------------------------------------------------------------------------
@@ -110,6 +132,19 @@ def _render_arg_type(annotation: Any) -> str:
     return getattr(annotation, "__name__", None) or str(annotation)
 
 
+def _wrap_ansi_for_readline(prompt: str) -> str:
+    """Wrap ANSI escapes so GNU readline treats them as zero-width."""
+    return _ANSI_ESCAPE.sub(
+        lambda match: f"{_READLINE_NONPRINT_START}{match.group(0)}{_READLINE_NONPRINT_END}",
+        prompt,
+    )
+
+
+def _strip_terminal_escapes(text: str) -> str:
+    """Remove terminal CSI sequences from raw input fallback buffers."""
+    return _CSI_ESCAPE.sub("", text)
+
+
 # ---------------------------------------------------------------------------
 # Builtin dispatch sentinel
 # ---------------------------------------------------------------------------
@@ -146,6 +181,8 @@ class InteractiveShell:
         self._prompt       = prompt
         self._program_name = program_name or Path(sys.argv[0]).name or "app.py"
         self._input_fn     = input_fn or input
+        self._using_builtin_input = input_fn is None
+        self._readline_enabled = self._using_builtin_input and _READLINE_AVAILABLE
         self._banner       = banner
         self._title        = title
         self._description  = description
@@ -176,6 +213,12 @@ class InteractiveShell:
             if not line:
                 continue
 
+            action = self._handle_shell_builtin_raw(line)
+            if action is _BuiltinAction.EXIT:
+                break
+            if action is _BuiltinAction.CONTINUE:
+                continue
+
             tokens = self._tokenize(line)
             if tokens is None:
                 continue
@@ -196,8 +239,15 @@ class InteractiveShell:
     # ------------------------------------------------------------------
 
     def _read_line(self) -> str | None:
+        prompt = self._c(self._prompt, _C.BOLD_GREEN)
+        if self._readline_enabled and self._colors:
+            prompt = _wrap_ansi_for_readline(prompt)
+
         try:
-            return self._input_fn(self._c(self._prompt, _C.BOLD_GREEN))
+            line = self._input_fn(prompt)
+            if self._using_builtin_input and not self._readline_enabled and "\x1b[" in line:
+                return _strip_terminal_escapes(line)
+            return line
         except EOFError:
             print()
             return None
@@ -220,6 +270,21 @@ class InteractiveShell:
     # ------------------------------------------------------------------
     # Builtin commands
     # ------------------------------------------------------------------
+
+    def _handle_shell_builtin_raw(self, line: str) -> _BuiltinAction:
+        if line == "exec":
+            self._error("'exec' requires a command to run.")
+            return _BuiltinAction.CONTINUE
+
+        if line.startswith("exec "):
+            command = line[len("exec"):].lstrip()
+            if not command:
+                self._error("'exec' requires a command to run.")
+                return _BuiltinAction.CONTINUE
+            self._run_exec(command)
+            return _BuiltinAction.CONTINUE
+
+        return _BuiltinAction.NOT_BUILTIN
 
     def _handle_shell_builtin(self, tokens: list[str]) -> _BuiltinAction:
         token = tokens[0]
@@ -247,6 +312,50 @@ class InteractiveShell:
             return _BuiltinAction.CONTINUE
 
         return _BuiltinAction.NOT_BUILTIN
+
+    def _run_exec(self, command: str) -> None:
+        launchers: list[tuple[str, list[str]]]
+        if _is_windows():
+            launchers = [
+                ("PowerShell", ["powershell", "-NoLogo", "-NoProfile", "-Command", command]),
+                ("cmd", ["cmd", "/c", command]),
+            ]
+        else:
+            launchers = [("bash", ["bash", "-lc", command])]
+
+        last_missing: FileNotFoundError | None = None
+
+        for shell_name, argv in launchers:
+            try:
+                result = subprocess.run(argv, capture_output=True, text=True)
+            except FileNotFoundError as exc:
+                last_missing = exc
+                logger.debug("Shell '%s' is unavailable for exec builtin.", shell_name, exc_info=True)
+                continue
+
+            self._print_process_output(result)
+            if result.returncode != 0:
+                self._error(f"'exec' command exited with status {result.returncode}.")
+            return
+
+        if _is_windows():
+            self._error("Unable to run 'exec': neither PowerShell nor cmd is available.")
+        else:
+            self._error("Unable to run 'exec': bash is not available.")
+        if last_missing is not None:
+            logger.debug("Last exec launcher error: %s", last_missing)
+
+    @staticmethod
+    def _print_process_output(result: Any) -> None:
+        stdout = getattr(result, "stdout", "") or ""
+        stderr = getattr(result, "stderr", "") or ""
+
+        if stdout:
+            end = "" if stdout.endswith("\n") else "\n"
+            print(stdout, end=end)
+        if stderr:
+            end = "" if stderr.endswith("\n") else "\n"
+            print(stderr, end=end, file=sys.stderr)
 
     def _print_command_help(self, target: str) -> None:
         try:
@@ -312,6 +421,7 @@ class InteractiveShell:
             ("help",           "Show this menu"),
             ("help <command>", "Show detailed help for a specific command"),
             ("commands",       "List all registered commands"),
+            ("exec <command>", "Run a system command in the host shell"),
             ("exit / quit",    "Leave interactive mode"),
         ]
         return "\n".join([
@@ -401,11 +511,3 @@ class InteractiveShell:
     def _c(self, text: str, code: str) -> str:
         """Apply an ANSI code when colors are enabled; no-op otherwise."""
         return f"{code}{text}{_C.RESET}" if self._colors else text
-
-
-# ---------------------------------------------------------------------------
-# ANSI escape pattern for visible-length measurement
-# ---------------------------------------------------------------------------
-
-import re
-_ANSI_ESCAPE = re.compile(r"\033\[[0-9;]*m")

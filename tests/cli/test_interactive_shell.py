@@ -1,6 +1,8 @@
+import os
 import pytest
 
 import functionals.cli as cli
+from functionals.cli.shell import _strip_terminal_escapes, _wrap_ansi_for_readline
 
 
 @pytest.fixture(autouse=True)
@@ -359,3 +361,96 @@ def test_interactive_help_for_help_builtin_does_not_suggest_help(capsys):
     out = capsys.readouterr().out
     assert "Built-in Command: help" in out
     assert "Did you mean 'help'" not in out
+
+
+def test_shell_strips_terminal_escape_sequences_from_raw_input():
+    raw = 'add "Task"\x1b[D\x1b[D'
+    assert _strip_terminal_escapes(raw) == 'add "Task"'
+
+
+def test_shell_wraps_ansi_prompt_for_readline():
+    prompt = "\x1b[1;32m> \x1b[0m"
+    wrapped = _wrap_ansi_for_readline(prompt)
+    assert wrapped.startswith("\x01\x1b[1;32m\x02")
+    assert wrapped.endswith("\x01\x1b[0m\x02")
+
+
+def test_interactive_mode_supports_exec_builtin(capsys, monkeypatch):
+    _register_interactive_commands()
+
+    calls: list[list[str]] = []
+
+    class _Result:
+        returncode = 0
+        stdout = "exec-ok\n"
+        stderr = ""
+
+    def _fake_run(argv, capture_output, text):
+        assert capture_output is True
+        assert text is True
+        calls.append(argv)
+        return _Result()
+
+    monkeypatch.setattr("functionals.cli.shell.subprocess.run", _fake_run)
+
+    cli.run_shell(
+        input_fn=_input_from_lines(["exec echo hello world", "quit"]),
+        print_result=False,
+        banner=False,
+        colors=False,
+    )
+
+    out = capsys.readouterr().out
+    assert "exec-ok" in out
+    assert calls
+    if os.name == "nt":
+        assert calls[0][:4] == ["powershell", "-NoLogo", "-NoProfile", "-Command"]
+        assert calls[0][4] == "echo hello world"
+    else:
+        assert calls[0][:2] == ["bash", "-lc"]
+        assert calls[0][2] == "echo hello world"
+
+
+def test_exec_falls_back_to_cmd_when_powershell_missing(capsys, monkeypatch):
+    _register_interactive_commands()
+
+    calls: list[str] = []
+
+    class _Result:
+        returncode = 0
+        stdout = "fallback-ok\n"
+        stderr = ""
+
+    def _fake_run(argv, capture_output, text):
+        calls.append(argv[0])
+        if argv[0] == "powershell":
+            raise FileNotFoundError("powershell missing")
+        return _Result()
+
+    monkeypatch.setattr("functionals.cli.shell._is_windows", lambda: True)
+    monkeypatch.setattr("functionals.cli.shell.subprocess.run", _fake_run)
+
+    cli.run_shell(
+        input_fn=_input_from_lines(["exec echo from-cmd", "quit"]),
+        print_result=False,
+        banner=False,
+        colors=False,
+    )
+
+    out = capsys.readouterr().out
+    assert "fallback-ok" in out
+    assert calls == ["powershell", "cmd"]
+
+
+def test_exec_requires_command_text(capsys):
+    _register_interactive_commands()
+
+    cli.run_shell(
+        input_fn=_input_from_lines(["exec", "quit"]),
+        print_result=False,
+        banner=False,
+        colors=False,
+    )
+
+    out = capsys.readouterr().out
+    assert "'exec' requires a command to run." in out
