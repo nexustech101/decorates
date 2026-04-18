@@ -171,9 +171,8 @@ fx --help
 Create a CLI-first project structure:
 
 ```bash
-mkdir todo_cli && cd todo_cli
-fx init cli TodoService .
-fx health .
+fx init cli TodoService
+fx health TodoService
 ```
 
 Expected structure:
@@ -187,9 +186,8 @@ plugins/__init__.py
 Create a DB-first project structure:
 
 ```bash
-mkdir ../todo_db && cd ../todo_db
-fx init db DataService .
-fx health .
+fx init db DataService
+fx health DataService
 ```
 
 Expected structure:
@@ -205,6 +203,7 @@ plugins/__init__.py
 
 Notes:
 - `fx init <project_name>` still works and defaults to `cli`.
+- If `root` is omitted, `fx init` uses `<project_name>` as the project directory.
 - `fx health` is the canonical check command (`--doctor` is kept as a compatibility alias).
 
 ### Database + FastAPI in 5 minutes

@@ -29,6 +29,12 @@ fx --interactive
 
 ## Quick Start
 
+Initialize a project in a new directory named after the project:
+
+```bash
+fx init cli MyService
+```
+
 Initialize a project in the current directory:
 
 ```bash
@@ -147,7 +153,8 @@ Tracked entities include:
 
 ## Notes
 
-- `root` defaults to `.` for all commands.
+- For `init`, when `root` is omitted and `project_name` is provided, `root` defaults to `project_name`.
+- For other commands, `root` defaults to `.`.
 - `module_name` and `alias` must be valid Python identifiers (hyphens are normalized to underscores).
 - `--force` overwrites scaffold files where supported.
 - `health` imports plugins from the local `plugins` package to verify runtime loadability.

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "decorates"
-version = "4.4.0"
+version = "4.4.1"
 description = "Decorator-driven CLI and database toolkit for Pydantic and SQLAlchemy."
 readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.10"

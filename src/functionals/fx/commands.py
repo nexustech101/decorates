@@ -69,25 +69,35 @@ def register(name: str | None = None, *, description: str = "", help: str = ""):
 @option("--init")
 @argument("project_type", type=str, default="cli", help="Project type: cli or db")
 @argument("project_name", type=str, default="", help="Project display name; defaults to root folder name")
-@argument("root", type=str, default=".", help="Project root path")
+@argument("root", type=str, default="", help="Project root path; defaults to <project_name> when provided")
 @argument("force", type=bool, default=False, help="Overwrite scaffold files if they already exist")
 def init(
     project_type: str = "cli",
     project_name: str = "",
-    root: str = ".",
+    root: str = "",
     force: bool = False,
 ) -> str:
-    root_path = resolve_root(root)
-    root_path.mkdir(parents=True, exist_ok=True)
     normalized_type = project_type.strip().lower() or "cli"
     if normalized_type not in {"cli", "db"}:
-        if project_name:
+        if root.strip():
             raise ValueError("project_type must be either 'cli' or 'db'.")
-        # Backward-compatible shape: fx init <project_name>
-        project_name = project_type
+        # Backward-compatible shapes:
+        #   fx init <project_name>
+        #   fx init <project_name> <root>
+        legacy_project_name = project_type
+        legacy_root = project_name
+        project_name = legacy_project_name
+        root = legacy_root
         normalized_type = "cli"
 
-    name = project_name.strip() or root_path.name
+    name = project_name.strip()
+    root_input = root.strip()
+    if not root_input:
+        root_input = name or "."
+    root_path = resolve_root(root_input)
+    root_path.mkdir(parents=True, exist_ok=True)
+    if not name:
+        name = root_path.name
 
     scaffold = init_project_layout(
         root=root_path,
