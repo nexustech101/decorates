@@ -99,7 +99,8 @@ def init_project_layout(*, root: Path, project_name: str, project_type: str, for
     updated: list[Path] = []
     skipped: list[Path] = []
 
-    pkg_name = package_name(project_name)
+    # New structured projects always use a stable import package: src/app
+    pkg_name = "app"
     dist_name = distribution_name(project_name)
     script_name = dist_name
     package_root = root / "src" / pkg_name
@@ -109,7 +110,7 @@ def init_project_layout(*, root: Path, project_name: str, project_type: str, for
     ensure_directory(root / "tests", created=created, skipped=skipped)
     ensure_directory(package_root, created=created, skipped=skipped)
     ensure_package(plugins_package, created=created, skipped=skipped)
-    (root / ".functionals").mkdir(parents=True, exist_ok=True)
+    (root / ".fx").mkdir(parents=True, exist_ok=True)
 
     shared_values = {
         "project_name": project_name,
@@ -280,6 +281,10 @@ def discover_project_package(root: Path) -> str | None:
     src_root = root / "src"
     if not src_root.exists():
         return None
+
+    app_pkg = src_root / "app" / "__init__.py"
+    if app_pkg.exists():
+        return "app"
 
     candidates = sorted(
         child.name

@@ -30,20 +30,34 @@ def test_fx_init_creates_structure_and_project_record(tmp_path: Path, monkeypatc
     project_root = tmp_path / "DemoProject"
     assert (project_root / "pyproject.toml").exists()
     assert (project_root / "README.md").exists()
-    assert (project_root / "src" / "demoproject" / "__main__.py").exists()
-    assert (project_root / "src" / "demoproject" / "todo.py").exists()
-    assert (project_root / "src" / "demoproject" / "plugins" / "__init__.py").exists()
+    assert (project_root / "src" / "app" / "__main__.py").exists()
+    assert (project_root / "src" / "app" / "todo.py").exists()
+    assert (project_root / "src" / "app" / "plugins" / "__init__.py").exists()
     assert (project_root / "tests" / "test_todo_cli.py").exists()
-    assert (project_root / ".functionals" / "fx.db").exists()
-    todo_content = (project_root / "src" / "demoproject" / "todo.py").read_text(encoding="utf-8")
+    assert (project_root / ".fx" / "fx.db").exists()
+    todo_content = (project_root / "src" / "app" / "todo.py").read_text(encoding="utf-8")
     assert "@cli.register(name=\"add\"" in todo_content
     assert "class TodoItem(BaseModel)" in todo_content
-    assert "cli.load_plugins(\"demoproject.plugins\"" in todo_content
+    assert "cli.load_plugins(\"app.plugins\"" in todo_content
 
     status = run(["status", str(project_root)], print_result=False)
     assert "Project record: present" in status
     assert "Project type: cli" in status
     assert "plugins package: present" in status
+
+
+def test_fx_init_cli_dot_uses_current_directory_and_app_package(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+
+    result = run(["init", "cli", "."], print_result=False)
+    assert f"Initialized cli project '{tmp_path.name}'" in result
+
+    assert (tmp_path / "src" / "app" / "__main__.py").exists()
+    assert (tmp_path / "src" / "app" / "todo.py").exists()
+    assert (tmp_path / "src" / "app" / "plugins" / "__init__.py").exists()
 
 
 def test_fx_module_add_cli_structures_files_and_registry(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -53,14 +67,14 @@ def test_fx_module_add_cli_structures_files_and_registry(tmp_path: Path, monkeyp
     result = run(["module-add", "cli", "users"], print_result=False)
     assert "Structured cli module 'users'" in result
 
-    assert (tmp_path / "src" / "demoproject" / "plugins" / "users" / "__init__.py").exists()
-    assert (tmp_path / "src" / "demoproject" / "plugins" / "users" / "users.py").exists()
+    assert (tmp_path / "src" / "app" / "plugins" / "users" / "__init__.py").exists()
+    assert (tmp_path / "src" / "app" / "plugins" / "users" / "users.py").exists()
 
     module_list = run(["module-list"], print_result=False)
-    assert "users  (cli)  demoproject.plugins.users" in module_list
+    assert "users  (cli)  app.plugins.users" in module_list
 
     plugin_list = run(["plugin-list"], print_result=False)
-    assert "users  ->  demoproject.plugins.users  (enabled)" in plugin_list
+    assert "users  ->  app.plugins.users  (enabled)" in plugin_list
 
 
 def test_fx_plugin_link_creates_alias_and_health_passes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -70,7 +84,7 @@ def test_fx_plugin_link_creates_alias_and_health_passes(tmp_path: Path, monkeypa
     result = run(["plugin-link", "math", "math_ops"], print_result=False)
     assert "Linked plugin 'math_ops' -> math" in result
 
-    link_file = tmp_path / "src" / "demoproject" / "plugins" / "math_ops" / "__init__.py"
+    link_file = tmp_path / "src" / "app" / "plugins" / "math_ops" / "__init__.py"
     assert link_file.exists()
     assert "from math import *" in link_file.read_text(encoding="utf-8")
 
@@ -99,11 +113,11 @@ def test_fx_init_db_creates_db_structure(tmp_path: Path, monkeypatch: pytest.Mon
 
     project_root = tmp_path / "DataProject"
     assert (project_root / "pyproject.toml").exists()
-    assert (project_root / "src" / "dataproject" / "api.py").exists()
-    assert (project_root / "src" / "dataproject" / "models.py").exists()
-    assert (project_root / "src" / "dataproject" / "plugins" / "__init__.py").exists()
+    assert (project_root / "src" / "app" / "api.py").exists()
+    assert (project_root / "src" / "app" / "models.py").exists()
+    assert (project_root / "src" / "app" / "plugins" / "__init__.py").exists()
     assert (project_root / "tests" / "test_user_api.py").exists()
-    api_content = (project_root / "src" / "dataproject" / "api.py").read_text(encoding="utf-8")
+    api_content = (project_root / "src" / "app" / "api.py").read_text(encoding="utf-8")
     assert "FastAPI" in api_content
     assert "@app.post(\"/users\"" in api_content
 
@@ -134,9 +148,9 @@ def test_fx_run_selects_cli_and_db_entrypoints(tmp_path: Path, monkeypatch: pyte
     run(["run", str(db_root), "--host", "0.0.0.0", "--port", "9000", "--reload"], print_result=False)
 
     assert calls
-    assert calls[0][0][:3] == [sys.executable, "-m", "cliproj"]
+    assert calls[0][0][:3] == [sys.executable, "-m", "app"]
     assert calls[0][1] == cli_root
-    assert calls[1][0][:4] == [sys.executable, "-m", "uvicorn", "dbproj.api:app"]
+    assert calls[1][0][:4] == [sys.executable, "-m", "uvicorn", "app.api:app"]
     assert "--reload" in calls[1][0]
     assert calls[1][1] == db_root
 
@@ -286,7 +300,7 @@ def test_fx_update_preserves_data_and_cache_paths(tmp_path: Path, monkeypatch: p
     monkeypatch.chdir(tmp_path)
     run(["init", "DemoProject", "."], print_result=False)
 
-    fx_db = tmp_path / ".functionals" / "fx.db"
+    fx_db = tmp_path / ".fx" / "fx.db"
     fx_db_bytes = fx_db.read_bytes()
     cache_dir = tmp_path / ".fx"
     cache_dir.mkdir(exist_ok=True)
@@ -334,19 +348,19 @@ def test_fx_pull_syncs_plugins_and_updates_registry(tmp_path: Path, monkeypatch:
     assert "created=1" in result
     assert "skipped=1" in result
 
-    alpha_init = tmp_path / "src" / "demoproject" / "plugins" / "alpha" / "__init__.py"
+    alpha_init = tmp_path / "src" / "app" / "plugins" / "alpha" / "__init__.py"
     assert alpha_init.exists()
     assert "VALUE='alpha'" in alpha_init.read_text(encoding="utf-8")
 
     plugin_list = run(["plugin-list"], print_result=False)
-    assert "alpha  ->  demoproject.plugins.alpha  (enabled)" in plugin_list
+    assert "alpha  ->  app.plugins.alpha  (enabled)" in plugin_list
 
 
 def test_fx_pull_force_overwrites_existing_plugins(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.chdir(tmp_path)
     run(["init", "DemoProject", "."], print_result=False)
 
-    existing = tmp_path / "src" / "demoproject" / "plugins" / "users"
+    existing = tmp_path / "src" / "app" / "plugins" / "users"
     existing.mkdir(parents=True, exist_ok=True)
     (existing / "__init__.py").write_text("VALUE='local'\n", encoding="utf-8")
 

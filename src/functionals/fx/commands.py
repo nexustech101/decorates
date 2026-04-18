@@ -117,10 +117,14 @@ def init(
     name = project_name.strip()
     root_input = root.strip()
     if not root_input:
-        root_input = name or "."
+        if name in {".", "./"}:
+            root_input = "."
+            name = ""
+        else:
+            root_input = name or "."
     root_path = resolve_root(root_input)
     root_path.mkdir(parents=True, exist_ok=True)
-    if not name:
+    if not name or name in {".", "./"}:
         name = root_path.name
 
     structure = init_project_layout(

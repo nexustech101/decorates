@@ -2,7 +2,7 @@
 Local control-plane storage for ``functionals.fx``.
 
 This module uses ``functionals.db`` registries against a project-local sqlite
-database (``.functionals/fx.db``) to track project metadata, modules, linked
+database (``.fx/fx.db``) to track project metadata, modules, linked
 plugins, and operation history.
 """
 
@@ -29,7 +29,15 @@ def resolve_root(root: str | Path | None = None) -> Path:
 
 
 def fx_home(root: str | Path | None = None) -> Path:
-    base = resolve_root(root) / ".functionals"
+    root_path = resolve_root(root)
+    base = root_path / ".fx"
+    legacy = root_path / ".functionals"
+    if not base.exists() and legacy.exists():
+        try:
+            legacy.rename(base)
+        except OSError:
+            # Fall back to creating the new path when rename is not possible.
+            pass
     base.mkdir(parents=True, exist_ok=True)
     return base
 

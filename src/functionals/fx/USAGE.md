@@ -2,7 +2,7 @@
 
 `functionals.fx` is a project management CLI built on:
 - `functionals.cli` for command registration, parsing, help, and interactive shell
-- `functionals.db` for local control-plane state in `.functionals/fx.db`
+- `functionals.db` for local control-plane state in `.fx/fx.db`
 
 It helps you initialize project structures, add module/plugin structure, validate wiring, and track operation history.
 
@@ -102,12 +102,12 @@ fx pull https://github.com/example/plugins-repo.git . --ref main --subdir plugin
 pyproject.toml
 README.md
 .gitignore
-src/<package_name>/__init__.py
-src/<package_name>/__main__.py
-src/<package_name>/todo.py
-src/<package_name>/plugins/__init__.py
+src/app/__init__.py
+src/app/__main__.py
+src/app/todo.py
+src/app/plugins/__init__.py
 tests/test_todo_cli.py
-.functionals/fx.db
+.fx/fx.db
 ```
 
 `fx init db` creates a FastAPI + user-management package layout:
@@ -116,13 +116,13 @@ tests/test_todo_cli.py
 pyproject.toml
 README.md
 .gitignore
-src/<package_name>/__init__.py
-src/<package_name>/__main__.py
-src/<package_name>/api.py
-src/<package_name>/models.py
-src/<package_name>/plugins/__init__.py
+src/app/__init__.py
+src/app/__main__.py
+src/app/api.py
+src/app/models.py
+src/app/plugins/__init__.py
 tests/test_user_api.py
-.functionals/fx.db
+.fx/fx.db
 ```
 
 `fx module-add cli <name>` creates:
@@ -186,7 +186,7 @@ from <package_path> import *
 `fx` stores metadata in:
 
 ```text
-.functionals/fx.db
+.fx/fx.db
 ```
 
 Tracked entities include:
@@ -199,7 +199,8 @@ Tracked entities include:
 
 - For `init`, when `root` is omitted and `project_name` is provided, `root` defaults to `project_name`.
 - For other commands, `root` defaults to `.`.
-- `<plugins_package>` resolves to `src/<package_name>/plugins` for package-style projects and `plugins/` for legacy layouts.
+- New projects always use `src/app` as the application package.
+- `<plugins_package>` resolves to `src/app/plugins` for package-style projects and `plugins/` for legacy layouts.
 - `module_name` and `alias` must be valid Python identifiers (hyphens are normalized to underscores).
 - `--force` overwrites structure files where supported.
 - `health` imports plugins from the local `plugins` package to verify runtime loadability.

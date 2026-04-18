@@ -180,11 +180,11 @@ Expected structure:
 ```text
 pyproject.toml
 README.md
-src/todoservice/__main__.py
-src/todoservice/todo.py
-src/todoservice/plugins/__init__.py
+src/app/__main__.py
+src/app/todo.py
+src/app/plugins/__init__.py
 tests/test_todo_cli.py
-.functionals/fx.db
+.fx/fx.db
 ```
 
 Create a DB-first project structure:
@@ -199,12 +199,12 @@ Expected structure:
 ```text
 pyproject.toml
 README.md
-src/dataservice/__main__.py
-src/dataservice/api.py
-src/dataservice/models.py
-src/dataservice/plugins/__init__.py
+src/app/__main__.py
+src/app/api.py
+src/app/models.py
+src/app/plugins/__init__.py
 tests/test_user_api.py
-.functionals/fx.db
+.fx/fx.db
 ```
 
 ![Screenshot](img2.png)
