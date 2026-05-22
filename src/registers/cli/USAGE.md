@@ -15,14 +15,13 @@ from enum import StrEnum
 from pathlib import Path
 from time import strftime
 
-import registers.cli as cli
-import registers.db as db
+from registers import CommandRegistry, DatabaseRegistry, db_field
 from pydantic import BaseModel
-from registers.db import db_field
 
 DB_PATH = str(Path(__file__).with_suffix(".db"))
 NOW = lambda: strftime("%Y-%m-%d %H:%M:%S")
 
+db = DatabaseRegistry()
 
 class TodoStatus(StrEnum):
     OPEN = "open"
@@ -54,7 +53,7 @@ def add_todo(title: str, description: str = "") -> dict[str, object]:
 
 
 @cli.register(name="list", description="List todo items", default_output="json")
-@cli.argument("status", type=cli.types.Choice(["open", "done"]), default="open")
+@cli.argument("status", type=t.Choice(["open", "done"]), default="open")
 @cli.alias("--list")
 @cli.alias("-l")
 def list_todos(status: str = "open") -> list[dict[str, object]]:
@@ -101,6 +100,7 @@ Decorator behavior:
 - `@register(..., examples=[...])` shows examples in command help, including interactive `help <command>`.
 - `@argument("name", type=..., help="...")` declares a public command argument.
 - `@argument(..., default=...)` makes the argument optional and shows the default in command help.
+- `@prompt("name", "Question?", type=Choice([...]))` prompts interactively when the argument is missing. Choice prompts accept either a number from the displayed list or the raw choice value; Python enums are supported too.
 - `@option("--flag")` and `@alias("-f")` register command aliases.
 - `default_output="json"` or `"csv"` sets a command's normal structured output.
 - `Choice([...])` validates values and displays choices in help and usage.
@@ -115,9 +115,9 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass
 
-import registers.cli as cli
+from registers import CommandRegistry, Context
 
-registry = cli.CommandRegistry()
+registry = CommandRegistry()
 
 
 @dataclass(frozen=True)
@@ -153,7 +153,7 @@ def _render_plain(columns: list[Column], rows: list[dict[str, str]]) -> None:
         print("  ".join(row[col.key].ljust(widths[col.key]) for col in columns))
 
 
-class OpsContext(cli.Context):
+class OpsContext(Context):
     def __init__(self, env: str = "prod", region: str = "us-east-1") -> None:
         self.env = env
         self.region = region
@@ -208,12 +208,12 @@ from __future__ import annotations
 
 import asyncio
 
-import registers.cli as cli
+from registers import CommandRegistry, Context, types as t
 
-registry = cli.CommandRegistry()
+registry = CommandRegistry()
 
 
-class OpsContext(cli.Context):
+class OpsContext(Context):
     def __init__(self, env: str = "prod", region: str = "us-east-1") -> None:
         self.env = env
         self.region = region
@@ -243,7 +243,7 @@ async def list_services(ctx: OpsContext) -> list[dict[str, str]]:
     description="Deploy one service with a safety preview",
     examples=["ops deploy service api", "ops d service worker 2026.05 --dry-run"],
 )
-@deploy.argument("name", type=cli.types.Choice(["api", "worker", "billing"]), help="Service to deploy")
+@deploy.argument("name", type=t.Choice(["api", "worker", "billing"]), help="Service to deploy")
 @deploy.argument("version", type=str, default="latest", help="Artifact version")
 @deploy.dry_run()
 def deploy_service(ctx: OpsContext, name: str, version: str = "latest", dry_run: bool = False) -> str:
@@ -252,8 +252,8 @@ def deploy_service(ctx: OpsContext, name: str, version: str = "latest", dry_run:
 
 
 @incidents.register("page", description="Prepare a page", default_output="json")
-@incidents.argument("service", type=cli.types.Choice(["api", "worker", "billing"]), help="Impacted service")
-@incidents.argument("severity", type=cli.types.Choice(["sev1", "sev2", "sev3"]), default="sev2")
+@incidents.argument("service", type=t.Choice(["api", "worker", "billing"]), help="Impacted service")
+@incidents.argument("severity", type=t.Choice(["sev1", "sev2", "sev3"]), default="sev2")
 def page_team(ctx: OpsContext, service: str, severity: str = "sev2") -> dict[str, str]:
     owner = {"api": "platform", "worker": "automation", "billing": "finance-eng"}[service]
     return {"env": ctx.env, "region": ctx.region, "service": service, "severity": severity, "page": f"{owner}-oncall"}
@@ -308,12 +308,12 @@ Runtime flags:
 Plugin composition keeps larger CLIs modular:
 
 ```python
-import registers.cli as cli
+from registers import CommandRegistry
 from cli.commands.billing import cli as billing_cli
 from cli.commands.ops import cli as ops_cli
 from cli.commands.users import cli as users_cli
 
-registry = cli.CommandRegistry()
+registry = CommandRegistry()
 registry.register_plugin(users_cli)
 registry.register_plugin(billing_cli)
 registry.register_plugin(ops_cli)
@@ -326,9 +326,9 @@ Each plugin can export its own registry:
 
 ```python
 # cli/commands/users.py
-import registers.cli as cli
+from registers import CommandRegistry
 
-users_cli = cli.CommandRegistry()
+users_cli = CommandRegistry()
 users = users_cli.group("users", aliases=["u"], description="User commands")
 
 
@@ -368,13 +368,13 @@ Pattern:
 
 ```python
 # cli/main.py
-import registers.cli as cli
+from registers import CommandRegistry, Context
 from internal_admin.app_context import AppContext
 from internal_admin.cli.commands.billing import cli as billing_cli
 from internal_admin.cli.commands.deploy import cli as deploy_cli
 from internal_admin.cli.commands.users import cli as users_cli
 
-registry = cli.CommandRegistry()
+registry = CommandRegistry()
 registry.register_plugin(users_cli)
 registry.register_plugin(billing_cli)
 registry.register_plugin(deploy_cli)
@@ -410,7 +410,7 @@ Guidelines:
 
 Public API checklist:
 
-- Module facade: `register`, `argument`, `option`, `alias`, `group`, `confirm`, `dry_run`, `context_factory`, `run`, `run_async`, `run_shell`
-- Registry API: `CommandRegistry`, `register_plugin`, `load_plugins`, `dispatch`, `dispatch_async`
-- Runtime helpers: `Context`, `types`, `DIContainer`, `Dispatcher`, `MiddlewareChain`
+- Module facade: `register`, `argument`, `prompt`, `option`, `alias`, `group`, `confirm`, `dry_run`, `context_factory`, `run`, `run_async`, `run_shell`
+- Registry API: `CommandRegistry`, `register_plugin`, `load_plugins`
+- Runtime helpers: `Context`, `types`
 - Exceptions: `RegistrationError`, `DuplicateCommandError`, `UnknownCommandError`, `CommandExecutionError`, `PluginLoadError`

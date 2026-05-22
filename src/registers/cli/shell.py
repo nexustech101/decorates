@@ -182,13 +182,11 @@ class InteractiveShell:
         usage: bool = False,
         output: str | None = None,
         quiet: bool = False,
-        verbose: bool = False,
         no_color: bool = False,
         completion: bool = False,
         history: bool = False,
         multiline: bool = False,
         log_level: str | int | None = None,
-        log_panel: bool = False,
         context: Any | None = None,
     ) -> None:
         self._registry     = registry
@@ -207,12 +205,10 @@ class InteractiveShell:
         self._usage        = usage
         self._output       = output
         self._quiet        = quiet
-        self._verbose      = verbose
         self._completion   = completion
         self._history      = history
         self._multiline    = multiline
         self._log_level    = log_level
-        self._log_panel    = log_panel
         self._context      = context
         self._prompt_session = self._build_prompt_session() if self._using_builtin_input else None
 

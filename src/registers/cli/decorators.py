@@ -66,6 +66,35 @@ def argument(
     return decorator
 
 
+def prompt(
+    name: str,
+    question: str,
+    *,
+    type: Any = str,
+    help: str = "",
+    default: Any = MISSING,
+    secret: bool = False,
+    confirm: bool = False,
+) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+    """Declare a prompted argument with a custom question."""
+
+    def decorator(fn: Callable[..., Any]) -> Callable[..., Any]:
+        _resolve_registry().stage_argument(
+            fn,
+            name,
+            arg_type=type,
+            help_text=help,
+            default=default,
+            prompt=True,
+            prompt_text=question,
+            secret=secret,
+            confirm=confirm,
+        )
+        return fn
+
+    return decorator
+
+
 def option(
     flag: str,
     *,
@@ -147,13 +176,11 @@ def run(
     shell_usage: bool = False,
     output: str | None = None,
     quiet: bool = False,
-    verbose: bool = False,
     no_color: bool = False,
     completion: bool = False,
     history: bool = False,
     multiline: bool = False,
     log_level: str | int | None = None,
-    log_panel: bool = False,
     event_loop: Any | None = None,
 ) -> Any:
     """Run the module-level default registry."""
@@ -172,13 +199,11 @@ def run(
         shell_usage=shell_usage,
         output=output,
         quiet=quiet,
-        verbose=verbose,
         no_color=no_color,
         completion=completion,
         history=history,
         multiline=multiline,
         log_level=log_level,
-        log_panel=log_panel,
         event_loop=event_loop,
     )
 
@@ -208,13 +233,11 @@ def run_shell(
     shell_usage: bool = False,
     output: str | None = None,
     quiet: bool = False,
-    verbose: bool = False,
     no_color: bool = False,
     completion: bool = False,
     history: bool = False,
     multiline: bool = False,
     log_level: str | int | None = None,
-    log_panel: bool = False,
 ) -> None:
     """Run the module-level default registry in interactive mode."""
 
@@ -232,13 +255,11 @@ def run_shell(
         shell_usage=shell_usage,
         output=output,
         quiet=quiet,
-        verbose=verbose,
         no_color=no_color,
         completion=completion,
         history=history,
         multiline=multiline,
         log_level=log_level,
-        log_panel=log_panel,
     )
 
 

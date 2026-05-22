@@ -192,10 +192,10 @@ class ApiKey(BaseModel):
     name: str
     owner_email: str
 
-created = ApiKey.objects.create(name="Production", owner_email="ops@example.com")
+api_key = ApiKey.objects.create(name="Production", owner_email="ops@example.com")
 
-assert isinstance(created.id, UUID)
-assert ApiKey.objects.require(created.id).name == "Production"
+assert isinstance(api_key.id, UUID)
+assert ApiKey.objects.require(api_key.id).name == "Production"
 ```
 
 ---

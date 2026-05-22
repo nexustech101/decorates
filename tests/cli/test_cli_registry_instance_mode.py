@@ -7,13 +7,7 @@ from types import ModuleType
 import pytest
 
 import registers.cli as cli
-from registers.cli import DependencyNotFoundError
 from registers.cli.exceptions import DuplicateCommandError
-
-
-class _Greeter:
-    def greet(self, name: str) -> str:
-        return f"hi:{name}"
 
 
 @pytest.fixture(autouse=True)
@@ -139,24 +133,6 @@ def test_instance_shell_path_dispatches_registered_command(capsys) -> None:
     assert "hello" in shell_out
 
 
-def test_instance_dispatch_supports_explicit_registry_and_container() -> None:
-    registry = cli.CommandRegistry()
-
-    @registry.register(description="Injected greet")
-    @registry.argument("name", type=str)
-    @registry.option("--injected")
-    def injected(name: str, service: _Greeter) -> str:
-        return service.greet(name)
-
-    container = cli.DIContainer()
-    container.register(_Greeter, _Greeter())
-
-    assert registry.dispatch("injected", {"name": "Ada"}, container=container) == "hi:Ada"
-
-    with pytest.raises(DependencyNotFoundError):
-        registry.dispatch("injected", {"name": "Ada"})
-
-
 def test_instance_discovery_load_plugins_targets_explicit_registry(tmp_path: Path) -> None:
     package_name = "instance_cli_plugins"
     package_dir = tmp_path / package_name
@@ -211,6 +187,37 @@ def test_instance_register_plugin_merges_commands_from_registry_instance() -> No
 
     assert host.run(["create-user", "ada@example.com"], print_result=False) == "user:ada@example.com"
     assert host.run(["health"], print_result=False) == "ok"
+
+
+def test_instance_register_plugin_preserves_group_scoped_aliases() -> None:
+    host = cli.CommandRegistry()
+    users_plugin = cli.CommandRegistry()
+    billing_plugin = cli.CommandRegistry()
+
+    users = users_plugin.group("users", aliases=["u"], description="User commands")
+    billing = billing_plugin.group("billing", aliases=["b"], description="Billing commands")
+
+    @users.register("list", description="List users")
+    @users.alias("--list")
+    def list_users() -> str:
+        return "users"
+
+    @billing.register("list", description="List invoices")
+    @billing.alias("--list")
+    def list_billing() -> str:
+        return "billing"
+
+    assert host.register_plugin(users_plugin) == 1
+    assert host.register_plugin(billing_plugin) == 1
+
+    assert host.run(["users", "--list"], print_result=False) == "users"
+    assert host.run(["u", "--list"], print_result=False) == "users"
+    assert host.run(["billing", "--list"], print_result=False) == "billing"
+    assert host.run(["b", "--list"], print_result=False) == "billing"
+
+    with pytest.raises(SystemExit) as exc:
+        host.run(["--list"], print_result=False)
+    assert exc.value.code == 2
 
 
 def test_instance_register_plugin_supports_module_with_cli_registry() -> None:

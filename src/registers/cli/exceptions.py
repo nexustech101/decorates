@@ -44,19 +44,6 @@ class UnknownCommandError(RegistrationError):
         self.name = name
 
 
-class DependencyNotFoundError(RegistrationError):
-    """Raised when the DI container cannot resolve a requested type."""
-
-    def __init__(self, dep_type: Any) -> None:
-        dep_name = getattr(dep_type, "__name__", repr(dep_type))
-        super().__init__(
-            f"No instance registered for type '{dep_name}'. "
-            "Register it with container.register() before dispatching.",
-            dependency=dep_name,
-        )
-        self.dep_type = dep_type
-
-
 class CommandExecutionError(RegistrationError):
     """Raised by CommandRegistry.run() when a handler fails unexpectedly."""
 

@@ -76,7 +76,7 @@ That consistency makes small projects faster to start and medium projects easier
 | **Registry isolation**           | Use module-level facades for small projects or owned registry instances for tests, plugins, tenants, and multi-surface apps. |
 | **Pydantic-first persistence**   | Persist Pydantic models without full ORM boilerplate while retaining SQLAlchemy-powered storage.                             |
 | **Manager-style CRUD**           | Use `Model.objects.create`, `require`, `filter`, `upsert`, `bulk_create`, `bulk_upsert`, and schema helpers.                 |
-| **CLI command runtime**          | Build scriptable CLIs, grouped operator consoles, structured output, async commands, prompts, safety gates, plugins, DI, middleware, and dispatch workflows. |
+| **CLI command runtime**          | Build scriptable CLIs, grouped operator consoles, structured output, async commands, prompts, safety gates, plugins, and context-driven workflows. |
 | **Cron/event automation**        | Define manual, interval, cron-expression, webhook, and file-change jobs with retries and runtime state.                      |
 | **Production error semantics**   | Structured exceptions, deterministic parse failures, duplicate/collision detection, and dead-letter states.                  |
 | **FastAPI-ready patterns**       | Use lifespan hooks, exception handlers, service-layer invariants, and manager-based persistence.                             |

@@ -45,6 +45,50 @@ def test_grouped_commands_support_longest_match_aliases():
     assert registry.run(["users", "deploy", "service", "api"], print_result=False) == "deploy:api"
     assert registry.run(["u", "d", "service", "api"], print_result=False) == "deploy:api"
 
+
+def test_grouped_command_aliases_are_scoped_to_group_path():
+    registry = cli.CommandRegistry()
+    users = registry.group("users", description="User commands", aliases=["u"])
+    projects = registry.group("projects", description="Project commands", aliases=["p"])
+
+    @users.register("list", description="List users")
+    @users.alias("--list")
+    @users.alias("-l")
+    def list_users() -> str:
+        return "users"
+
+    @projects.register("list", description="List projects")
+    @projects.alias("--list")
+    @projects.alias("-l")
+    def list_projects() -> str:
+        return "projects"
+
+    assert registry.run(["users", "--list"], print_result=False) == "users"
+    assert registry.run(["users", "-l"], print_result=False) == "users"
+    assert registry.run(["u", "--list"], print_result=False) == "users"
+    assert registry.run(["projects", "--list"], print_result=False) == "projects"
+    assert registry.run(["p", "-l"], print_result=False) == "projects"
+
+    with pytest.raises(SystemExit) as exc:
+        registry.run(["--list"], print_result=False)
+    assert exc.value.code == 2
+
+
+def test_nested_group_command_aliases_are_scoped_to_group_alias_paths():
+    registry = cli.CommandRegistry()
+    users = registry.group("users", aliases=["u"])
+    deploy = users.group("deploy", aliases=["d"])
+
+    @deploy.register("service", description="Deploy service")
+    @deploy.alias("--service")
+    @deploy.argument("name", type=str)
+    def deploy_service(name: str) -> str:
+        return f"deploy:{name}"
+
+    assert registry.run(["users", "deploy", "--service", "api"], print_result=False) == "deploy:api"
+    assert registry.run(["u", "d", "--service", "api"], print_result=False) == "deploy:api"
+
+
 def test_command_argument_named_output_wins_over_framework_output_flag():
     registry = cli.CommandRegistry()
 
@@ -128,7 +172,43 @@ def test_prompt_confirmation_and_dry_run(capsys):
     assert registry.run(["migrate", "--dry-run"], print_result=False) is True
 
 
-def test_async_commands_context_and_dispatch_async():
+def test_prompt_decorator_supports_choices_and_enums():
+    registry = cli.CommandRegistry()
+
+    class Region(enum.Enum):
+        east = "us-east-1"
+        west = "us-west-2"
+
+    @registry.register(description="Deploy")
+    @registry.prompt("env", "Choose environment", type=t.Choice(["dev", "prod"]))
+    @registry.prompt("region", "Choose region", type=Region)
+    def deploy(env: str, region: Region) -> tuple[str, str]:
+        return env, region.value
+
+    seen_prompts: list[str] = []
+    answers = iter(["2", "us-west-2"])
+
+    def read(prompt: str) -> str:
+        seen_prompts.append(prompt)
+        return next(answers)
+
+    result = registry.run(
+        ["deploy"],
+        print_result=False,
+        shell_input_fn=read,
+    )
+
+    assert result == ("prod", "us-west-2")
+    prompts = "\n".join(seen_prompts)
+    assert "Choose environment" in prompts
+    assert "1. dev" in prompts
+    assert "2. prod" in prompts
+    assert "Choose region" in prompts
+    assert "us-east-1" in prompts
+    assert "us-west-2" in prompts
+
+
+def test_async_commands_and_context():
     registry = cli.CommandRegistry()
 
     class AppContext(Context):
@@ -163,3 +243,4 @@ def test_async_commands_context_and_dispatch_async():
 def test_public_exports_include_future_helpers():
     assert cli.Context
     assert cli.types.Choice
+    assert cli.prompt

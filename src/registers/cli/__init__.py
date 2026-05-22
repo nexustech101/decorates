@@ -27,7 +27,6 @@ Instance-mode is also supported for isolated command scopes:
         registry.run()
 """
 
-from registers.cli.container import DIContainer
 from registers.cli.decorators import (
     argument,
     confirm,
@@ -38,25 +37,19 @@ from registers.cli.decorators import (
     list_commands,
     option,
     alias,
+    prompt,
     register,
     reset_registry,
     run,
     run_async,
     run_shell,
 )
-from registers.cli.dispatcher import Dispatcher
 from registers.cli.exceptions import (
     CommandExecutionError,
-    DependencyNotFoundError,
     DuplicateCommandError,
     RegistrationError,
     PluginLoadError,
     UnknownCommandError,
-)
-from registers.cli.middleware import (
-    MiddlewareChain,
-    logging_middleware_post,
-    logging_middleware_pre,
 )
 from registers.cli.parser import ParseError, parse_command_args
 from registers.cli.plugins import load_plugins
@@ -70,6 +63,7 @@ __all__ = [
     "argument",
     "option",
     "alias",
+    "prompt",
     "group",
     "confirm",
     "dry_run",
@@ -91,17 +85,11 @@ __all__ = [
     "parse_command_args",
     "ParseError",
 
-    # Legacy advanced runtime components
-    "DIContainer",
-    "Dispatcher",
-    "MiddlewareChain",
+    # Plugin loading
     "load_plugins",
-    "logging_middleware_pre",
-    "logging_middleware_post",
 
     # Exceptions
     "CommandExecutionError",
-    "DependencyNotFoundError",
     "DuplicateCommandError",
     "RegistrationError",
     "PluginLoadError",
