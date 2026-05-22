@@ -48,7 +48,28 @@ import uuid
 from typing import Any, Callable, Generator, Generic, Iterator, Mapping, TypeVar
 
 from pydantic import BaseModel, TypeAdapter, ValidationError
-from sqlalchemy import JSON, Column, DateTime, ForeignKey, Index, Integer, LargeBinary, MetaData, String, Table, and_, delete, event, func, inspect, not_, or_, select, text, update
+from sqlalchemy import (
+    JSON, 
+    Column, 
+    DateTime, 
+    ForeignKey, 
+    Index, 
+    Integer, 
+    LargeBinary, 
+    MetaData, 
+    String, 
+    Table, 
+    and_, 
+    delete, 
+    event, 
+    func, 
+    inspect, 
+    not_, 
+    or_, 
+    select, 
+    text, 
+    update
+)
 from sqlalchemy.engine import Connection
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
@@ -100,7 +121,7 @@ MIGRATION_LEDGER_TABLE = "registers_schema_migrations"
 
 
 @contextmanager
-def tenant_scope(tenant: Any) -> Iterator[None]:
+def tenant_scope(tenant: Any) -> Generator[None, None, None]:
     """Apply a tenant value to tenant-scoped manager operations in this context."""
     token = _TENANT_SCOPE.set(tenant)
     try:
@@ -110,7 +131,7 @@ def tenant_scope(tenant: Any) -> Iterator[None]:
 
 
 @contextmanager
-def unscoped() -> Iterator[None]:
+def unscoped() -> Generator[None, None, None]:
     """Temporarily bypass tenant and soft-delete default filters."""
     token = _TENANT_UNSCOPED.set(True)
     try:
@@ -120,7 +141,7 @@ def unscoped() -> Iterator[None]:
 
 
 @contextmanager
-def audit_actor(actor: str | None) -> Iterator[None]:
+def audit_actor(actor: str | None) -> Generator[None, None, None]:
     """Attach an actor value to audit rows written in this context."""
     token = _AUDIT_ACTOR.set(actor)
     try:
@@ -462,7 +483,7 @@ class _ModelManager(Generic[ModelT]):
                 _ACTIVE_CONNECTIONS.reset(token)
 
     @contextmanager
-    def _connection_scope(self) -> Iterator[Connection]:
+    def _connection_scope(self) -> Generator[Connection, None, None]:
         if self._context.disposed:
             raise SchemaError(
                 f"Database manager for '{self.model_cls.__name__}' has been disposed.",
@@ -479,7 +500,7 @@ class _ModelManager(Generic[ModelT]):
             yield conn
 
     @contextmanager
-    def _read_connection_scope(self) -> Iterator[Connection]:
+    def _read_connection_scope(self) -> Generator[Connection, None, None]:
         active = _ACTIVE_CONNECTIONS.get().get(self.database_url)
         if active is not None:
             yield active
@@ -709,10 +730,12 @@ class _ModelManager(Generic[ModelT]):
         mutable_records = [self._prepare_create_data(dict(record)) for record in records]
         self._call_hook("before_bulk_create", mutable_records)
         instances = [self.model_cls(**record) for record in mutable_records]
+
         for instance in instances:
             self._prepare_instance_for_save(instance, is_create=True)
         for instance in instances:
             self._reject_explicit_autoincrement_key(instance)
+
         values_list = [self._prepare_insert_values(instance) for instance in instances]
 
         try:
@@ -817,6 +840,7 @@ class _ModelManager(Generic[ModelT]):
         criteria = self._with_policy_criteria(criteria, include_deleted=include_deleted)
         stmt = self._apply_where(stmt, criteria)
         stmt = self._apply_q_conditions(stmt, conditions)
+
         if order_by is not None:
             stmt = self._apply_order_by(stmt, order_by)
         if limit is not None:
@@ -962,12 +986,15 @@ class _ModelManager(Generic[ModelT]):
         self._validate_pagination(limit=limit, offset=None)
         if limit == 0:
             return Page(items=[], next_cursor=None, has_next=False)
+        
         descending = order_by.startswith("-")
         field = order_by[1:] if descending else order_by
         self._assert_known_projection_fields((field,))
+
         if cursor is not None:
             cursor_value = self._decode_cursor(cursor)
             criteria[f"{field}__lt" if descending else f"{field}__gt"] = cursor_value
+
         rows = self.filter(limit=limit + 1, order_by=order_by, **criteria)
         has_next = len(rows) > limit
         items = rows[:limit]
@@ -1751,7 +1778,7 @@ class _ModelManager(Generic[ModelT]):
                 table=self.table_name,
             )
         try:
-            from cryptography.fernet import Fernet
+            from cryptography.fernet import Fernet # type: ignore
         except Exception as exc:  # pragma: no cover
             raise InvalidQueryError(
                 "Encrypted fields require the optional 'cryptography' package.",

@@ -129,6 +129,9 @@ from registers import (
     database_registry,
     DatabaseRegistry,
     db_field,
+    Q,
+    Agg,
+    Page,
     HasMany,
     BelongsTo,
     HasManyThrough,
@@ -415,6 +418,8 @@ User.objects.filter(name__ilike="ali%")
 
 ```python
 User.objects.filter(order_by="name")           # ascending
+User.objects.filter(order_by="id")             # ascending
+User.objects.filter(order_by="-id")            # descending
 User.objects.filter(order_by="-created_at")    # descending
 User.objects.all(order_by=["role", "-name"])   # multi-column
 ```
@@ -425,7 +430,159 @@ User.objects.all(order_by=["role", "-name"])   # multi-column
 User.objects.filter(order_by="id", limit=20, offset=40)
 ```
 
+Offset pagination is simple and works well for small back-office screens. For public list endpoints or frequently changing tables, prefer cursor pagination with `paginate(...)`; it returns a `Page` object documented below.
+
 > **Validation:** Unknown fields/operators raise `InvalidQueryError`. Iterable equality values are rejected — use `id__in=[1, 2]` instead of `id=[1, 2]`. Both `limit` and `offset` must be `>= 0`.
+
+### Composable Predicates with `Q`
+
+Use `Q(...)` when a query needs grouped boolean logic that cannot be expressed cleanly as plain keyword criteria. A `Q` object accepts the same `field__operator=value` syntax as `filter(...)`, and combines with normal Python operators:
+
+| Operator | Meaning | Example |
+|---|---|---|
+| `&` | AND | `Q(status="active") & Q(age__gte=18)` |
+| `|` | OR | `Q(status="active") | Q(status="trial")` |
+| `~` | NOT | `~Q(status="disabled")` |
+
+```python
+from registers import Q
+
+# status = active OR status = trial
+users = User.objects.filter(
+    Q(status="active") | Q(status="trial"),
+    order_by="-created_at",
+)
+
+# (age >= 18 AND role = member) AND NOT disabled
+eligible = User.objects.filter(
+    Q(age__gte=18, role="member") & ~Q(status="disabled"),
+    order_by="email",
+)
+
+# Positional Q objects compose with keyword criteria through AND.
+admins = User.objects.filter(
+    Q(status="active") | Q(status="trial"),
+    role="admin",
+)
+```
+
+`exclude(...)` inverts the predicates for you:
+
+```python
+not_disabled = User.objects.exclude(status="disabled")
+not_banned_or_disabled = User.objects.exclude(
+    Q(status="banned") | Q(status="disabled")
+)
+```
+
+Projection helpers also accept a `q=` predicate:
+
+```python
+rows = User.objects.select("id", "email", q=Q(status="active") | Q(status="trial"))
+emails = User.objects.values_list("email", q=Q(role="admin"))
+```
+
+Use plain keyword filters for simple AND queries, and reach for `Q` only when grouping, OR, or NOT makes the query clearer. Positional `filter(...)` arguments must be `Q` objects; passing another value raises `InvalidQueryError`.
+
+### Projection and Aggregate Queries
+
+Use projections when an endpoint only needs a few fields and should not hydrate full model instances:
+
+```python
+rows = User.objects.select("id", "email", "role", status="active")
+# [{"id": 1, "email": "alice@example.com", "role": "admin"}, ...]
+
+emails = User.objects.values_list("email", status="active")
+# ["alice@example.com", "bob@example.com"]
+
+counts = User.objects.count_by("role", status__in=["active", "trial"])
+# {"admin": 2, "member": 18}
+```
+
+Projected fields must be real database columns. Encrypted fields cannot be selected directly because the database stores ciphertext.
+
+Use `Agg` with `aggregate(...)` for database-side summaries:
+
+```python
+from registers import Agg
+
+total = User.objects.aggregate(Agg.count("id"))
+# 42
+
+stats = User.objects.aggregate(
+    total=Agg.count("id"),
+    active=Agg.count("id", status="active"),
+    average_age=Agg.avg("age"),
+    youngest=Agg.min("age"),
+    oldest=Agg.max("age"),
+    unique_roles=Agg.count_distinct("role"),
+)
+# {
+#     "total": 42,
+#     "active": 31,
+#     "average_age": 34.5,
+#     "youngest": 18,
+#     "oldest": 72,
+#     "unique_roles": 3,
+# }
+```
+
+`Agg.count()` defaults to `"*"`, which counts the model key field internally. For normal count purposes these are equivalent:
+
+```python
+User.objects.aggregate(Agg.count())
+User.objects.aggregate(Agg.count("id"))
+```
+
+Each `Agg` can carry its own criteria, and `aggregate(...)` can also receive global criteria. Global criteria apply to the whole aggregate query; criteria on a specific `Agg` apply only to that expression.
+
+```python
+summary = Order.objects.aggregate(
+    total=Agg.count("id"),
+    paid_revenue=Agg.sum("total", status="paid"),
+    failed_revenue=Agg.sum("total", status="failed"),
+    customer_id=customer.id,       # global filter for every aggregate
+)
+```
+
+A single unnamed aggregate returns a scalar. Multiple aggregates or any named aggregate return a dictionary keyed by the generated label or the explicit keyword name. Prefer named aggregates in application code so response keys stay stable.
+
+### Cursor Pagination with `Page`
+
+`paginate(...)` returns a `Page` object:
+
+```python
+from registers import Page
+
+page: Page = User.objects.paginate(order_by="-created_at", limit=20)
+
+for user in page.items:
+    ...
+
+if page.has_next:
+    next_page = User.objects.paginate(
+        order_by="-created_at",
+        limit=20,
+        cursor=page.next_cursor,
+    )
+```
+
+`Page` has three fields:
+
+| Field | Meaning |
+|---|---|
+| `items` | Hydrated model instances for the current page. |
+| `next_cursor` | Opaque string to pass to the next `paginate(...)` call, or `None`. |
+| `has_next` | `True` when another page is available. |
+
+Cursor pagination currently supports one stable order field:
+
+```python
+User.objects.paginate(order_by="id", limit=50)
+User.objects.paginate(order_by="-created_at", limit=20, status="active")
+```
+
+Use a unique or near-unique ordering field such as `id`, `created_at`, or `-created_at`. The cursor stores the last item's ordered field value and applies `field__gt` for ascending order or `field__lt` for descending order on the next request. Invalid cursors raise `InvalidQueryError`, and `limit` must be non-negative.
 
 ---
 
@@ -979,6 +1136,9 @@ from registers import (
     database_registry,
     DatabaseRegistry,
     db_field,
+    Q,
+    Agg,
+    Page,
     HasMany,
     BelongsTo,
     HasManyThrough,
@@ -1015,7 +1175,8 @@ from registers import (
 |---|---|
 | Create/update | `create`, `strict_create`, `upsert`, `save`, `update_where` |
 | Delete | `delete`, `delete_where` |
-| Read | `get`, `require`, `filter`, `all`, `get_all`, `exists`, `count`, `first`, `last`, `refresh` |
+| Read | `get`, `require`, `filter`, `exclude`, `all`, `get_all`, `exists`, `count`, `first`, `last`, `refresh` |
+| Projection/query helpers | `select`, `values_list`, `count_by`, `aggregate`, `paginate` |
 | Bulk | `bulk_create`, `bulk_upsert` |
 | Schema | `ensure_column`, `add_column`, `rename_table`, `column_names`, `diff_schema`, `assert_schema_current` |
 | Transaction/lifecycle | `transaction`, `dispose` |
