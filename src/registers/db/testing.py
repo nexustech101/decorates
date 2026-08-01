@@ -3,9 +3,8 @@ from __future__ import annotations
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Iterator
+from typing import Any, Callable, Generator, Iterator
 
-from pydantic import BaseModel
 from sqlalchemy import event
 
 from registers.db.engine import _engines
@@ -27,18 +26,18 @@ class TestRegistry(DatabaseRegistry):
 
 @dataclass
 class ModelFactory:
-    model_cls: type[BaseModel]
+    model_cls: type
     defaults: dict[str, Any] = field(default_factory=dict)
 
-    def build(self, **overrides: Any) -> BaseModel:
+    def build(self, **overrides: Any) -> Any:
         values = self._values(0, overrides)
         return self.model_cls(**values)
 
-    def create(self, **overrides: Any) -> BaseModel:
+    def create(self, **overrides: Any) -> Any:
         values = self._values(0, overrides)
         return self.model_cls.objects.create(**values)
 
-    def create_batch(self, count: int, **overrides: Any) -> list[BaseModel]:
+    def create_batch(self, count: int, **overrides: Any) -> list[Any]:
         return [
             self.model_cls.objects.create(**self._values(index, overrides))
             for index in range(count)
@@ -51,12 +50,12 @@ class ModelFactory:
         return values
 
 
-def factory(model_cls: type[BaseModel], defaults: dict[str, Any] | None = None) -> ModelFactory:
+def factory(model_cls: type, defaults: dict[str, Any] | None = None) -> ModelFactory:
     return ModelFactory(model_cls, defaults or {})
 
 
 @contextmanager
-def assert_query_count(*, max: int) -> Iterator[None]:
+def assert_query_count(*, max: int) -> Generator[None]:
     """Assert that SQLAlchemy engines execute at most ``max`` statements."""
 
     count = {"value": 0}

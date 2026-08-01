@@ -7,10 +7,9 @@ from __future__ import annotations
 from functools import lru_cache
 from datetime import datetime, timezone
 import json
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
-
-from pydantic import BaseModel
 
 from registers.db.registry import _ModelManager
 
@@ -41,7 +40,8 @@ def control_db_path(root: str | Path | None = None) -> Path:
     return fx_home(root) / "fx.db"
 
 
-class CronJobRecord(BaseModel):
+@dataclass(kw_only=True)
+class CronJobRecord:
     id: int | None = None
     job_key: str
     project_root: str
@@ -65,7 +65,8 @@ class CronJobRecord(BaseModel):
     updated_at: str
 
 
-class CronRunRecord(BaseModel):
+@dataclass(kw_only=True)
+class CronRunRecord:
     id: int | None = None
     project_root: str
     job_name: str
@@ -77,7 +78,8 @@ class CronRunRecord(BaseModel):
     duration_ms: int = 0
 
 
-class CronEventRecord(BaseModel):
+@dataclass(kw_only=True)
+class CronEventRecord:
     id: int | None = None
     project_root: str
     job_name: str
@@ -89,7 +91,8 @@ class CronEventRecord(BaseModel):
     error: str = ""
 
 
-class CronRuntimeRecord(BaseModel):
+@dataclass(kw_only=True)
+class CronRuntimeRecord:
     id: int | None = None
     project_root: str
     pid: int
@@ -100,7 +103,8 @@ class CronRuntimeRecord(BaseModel):
     updated_at: str
 
 
-class CronWorkflowRecord(BaseModel):
+@dataclass(kw_only=True)
+class CronWorkflowRecord:
     id: int | None = None
     workflow_key: str
     project_root: str

@@ -125,3 +125,36 @@ class InvalidQueryError(RegistryError):
     """Raised when filter criteria reference unknown fields or are malformed."""
 
     DEFAULT_OPERATION = "invalid_query"
+
+
+class StaleDataError(RegistryError):
+    """
+    Raised when a write would overwrite a change made by someone else.
+
+    Only models configured with ``version_field=`` can raise this. The record was
+    read at one version, modified, and by the time the write landed the stored
+    version had moved on — meaning another writer got there first and this write
+    would silently discard their change.
+
+    The caller decides what to do: re-read and reapply, surface a 409, or merge.
+    Retrying blindly is only safe when the work in between has no side effects.
+
+        try:
+            order.status = "shipped"
+            order.save()
+        except StaleDataError:
+            order = Order.objects.require(order.id)   # someone else moved it
+            ...
+    """
+
+    DEFAULT_OPERATION = "stale_data"
+
+    def __init__(
+        self,
+        message: str | None = None,
+        *,
+        expected_version: Any = None,
+        **context: Any,
+    ) -> None:
+        super().__init__(message, expected_version=expected_version, **context)
+        self.expected_version = expected_version

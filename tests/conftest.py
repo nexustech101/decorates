@@ -22,6 +22,18 @@ BACKEND_URLS = {
     "postgres": "postgresql+psycopg://registers:registers@127.0.0.1:54329/registers_test",
     "mysql": "mysql+pymysql://registers:registers@127.0.0.1:33069/registers_test",
 }
+
+# CI (and anyone with a database already running) can point the backend fixtures at
+# an existing server instead of having the fixture start docker-compose itself.
+_ENV_BACKEND = os.environ.get("REGISTERS_TEST_BACKEND")
+_ENV_DB_URL = os.environ.get("REGISTERS_TEST_DB_URL")
+if _ENV_BACKEND and _ENV_DB_URL:
+    BACKEND_URLS[_ENV_BACKEND] = _ENV_DB_URL
+
+
+def backend_url(name: str) -> str | None:
+    """Return the connection URL for a backend, or None when it isn't configured."""
+    return BACKEND_URLS.get(name)
 BACKEND_DRIVER_MODULES = {
     "postgres": "psycopg",
     "mysql": "pymysql",

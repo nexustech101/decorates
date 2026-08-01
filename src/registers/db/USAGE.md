@@ -115,11 +115,77 @@ That's it. No base classes to inherit. No metaclass magic. No mappers to configu
 
 ---
 
+## Model Flavours: Pydantic or Dataclasses
+
+`registers.db` accepts two kinds of model. Both go through the same manager API, and
+everything in this manual applies to both unless stated otherwise.
+
+```python
+# Pydantic — requires the `pydantic` extra
+from pydantic import BaseModel
+from registers import database_registry, db_field
+
+@database_registry("sqlite:///app.db", table_name="users", unique_fields=["email"])
+class User(BaseModel):
+    id: int | None = db_field(id_strategy="autoincrement", default=None)
+    email: str
+    name: str
+```
+
+```python
+# Dataclass — stdlib only, ~2.2x less memory per loaded row
+from dataclasses import dataclass
+from registers import database_registry, dc_field
+
+@database_registry("sqlite:///app.db", table_name="users", unique_fields=["email"])
+@dataclass
+class User:
+    id: int | None = dc_field(id_strategy="autoincrement", default=None)
+    email: str = ""
+    name: str = ""
+```
+
+`dc_field(...)` takes exactly the same options as `db_field(...)`. The difference is only
+where the metadata is carried: `db_field` uses Pydantic's `json_schema_extra`, `dc_field`
+uses the standard `dataclasses.field(metadata=...)` mapping.
+
+### Which to choose
+
+| | Pydantic | Dataclass |
+|---|---|---|
+| Memory, 20k loaded rows | 27.5 MB (1,377 B/row) | 12.5 MB (624 B/row) |
+| Dependency | `pip install registers[pydantic]` | stdlib only |
+| Write-time validation | full Pydantic validation | per-field coercion for storable types |
+| Nested models, custom validators, JSON Schema | yes | use Pydantic |
+
+Dataclasses are the better default for read-heavy services that hydrate many rows. Reach
+for Pydantic when you need its validation depth — custom validators, constrained types, or
+JSON Schema generation for an API layer.
+
+### Notes on dataclass models
+
+- Write-time type checking is real: `create(age="42")` stores the integer `42`, and
+  `create(age="abc")` raises. Both `pydantic.ValidationError` and the dataclass path's
+  `FieldCoercionError` subclass `ValueError`, so `except ValueError` covers both.
+- Use `@dataclass(kw_only=True)` when you want required fields declared after
+  defaulted ones.
+- **Do not use `slots=True`.** The registry stamps an identity attribute onto instances,
+  and relationship prefetch caches loaded rows on them; a slotted class can hold neither.
+  Registration raises `ModelRegistrationError` if you try.
+- Fields typed with a nested dataclass are stored as JSON and rebuilt on read. A field
+  typed `Any` comes back as a plain dict, since there is no annotation to rebuild from.
+
+---
+
 ## Installation
 
 ```bash
-pip install registers
+pip install registers              # dataclass models, stdlib only
+pip install registers[pydantic]    # to use pydantic.BaseModel models
 ```
+
+Pydantic is an optional dependency as of this release. Existing Pydantic models keep
+working unchanged; install the extra and nothing about your code changes.
 
 **Core imports:**
 
@@ -434,6 +500,8 @@ Offset pagination is simple and works well for small back-office screens. For pu
 
 > **Validation:** Unknown fields/operators raise `InvalidQueryError`. Iterable equality values are rejected — use `id__in=[1, 2]` instead of `id=[1, 2]`. Both `limit` and `offset` must be `>= 0`.
 
+> **`exclude()` and NULL:** `exclude(status="disabled")` compiles to `NOT (status = 'disabled')`, which in SQL does **not** match rows where `status IS NULL`. To include them, add `Q(status__is_null=True)` explicitly.
+
 ### Composable Predicates with `Q`
 
 Use `Q(...)` when a query needs grouped boolean logic that cannot be expressed cleanly as plain keyword criteria. A `Q` object accepts the same `field__operator=value` syntax as `filter(...)`, and combines with normal Python operators:
@@ -654,7 +722,15 @@ db.assert_schema_current()      # raises MigrationError on drift
 db.dispose_all()                # shutdown cleanup for this registry's engines
 ```
 
-`create_all()` also ensures a lightweight `registers_schema_migrations` ledger table. The ledger is intentionally small; use Alembic or direct SQLAlchemy migrations for complex upgrade/downgrade workflows.
+`create_all()` also ensures a `registers_schema_migrations` ledger table. Every column
+applied by `migrate(dry_run=False)` is recorded there, and `Model.objects.applied_migrations()`
+reads it back, so what ran against a database is auditable after the fact.
+
+**Scope, stated plainly:** `migrate()` adds missing columns and nothing else. Renames,
+drops, type changes, and data backfills are out of scope by design — they need review,
+ordering, and a rollback plan. `diff_schema()` keeps reporting them so drift stays visible
+rather than being silently applied. For those, use Alembic; the two coexist fine, since
+this ledger only records what this library did.
 
 ### Class-Level Schema Control
 
@@ -849,6 +925,101 @@ dispose_all()             # global cleanup — use at app shutdown / test teardo
 
 ---
 
+## Concurrency & Correctness
+
+Anything with more than one writer needs a deliberate answer to "what if two requests
+touch this row at once". `registers.db` offers two mechanisms; they solve different
+problems and compose.
+
+### 1. `F(...)` — let the database do the arithmetic
+
+Best for counters, balances, and stock: anything expressible as "change this column
+*relative* to its current value".
+
+```python
+from registers import F
+
+Product.objects.update_where({"id": pid, "stock__gte": qty}, stock=F("stock") - qty)
+Account.objects.update_where({"id": aid}, balance=F("balance") + amount)
+Post.objects.update_where({"id": pid}, view_count=F("view_count") + 1)
+```
+
+`F` supports `+ - * /` against literals and other columns, in either order:
+`F("price") * Decimal("1.08")`, `F("balance") + F("pending")`, `100 - F("used")`.
+
+Pair it with a guard in the criteria and check the returned list. `update_where` returns
+the rows it changed, so `[]` means the guard rejected the write — that is your
+out-of-stock, insufficient-funds, or wrong-state signal.
+
+### 2. `version_field` — optimistic locking
+
+Best for whole-record edits where the new value genuinely depends on reading the old one,
+or where a human is editing a form. Declare an integer version column:
+
+```python
+@db.database_registry(DB, table_name="orders", version_field="version")
+class Order(BaseModel):
+    id: int | None = db_field(id_strategy="autoincrement", default=None)
+    status: str
+    version: int = 1
+```
+
+Every save becomes a compare-and-swap:
+`UPDATE orders SET ..., version = 3 WHERE id = 1 AND version = 2`. If another writer got
+there first, zero rows match and the save raises `StaleDataError` instead of silently
+overwriting them.
+
+```python
+from registers import StaleDataError
+
+def ship(order_id: int) -> Order:
+    for _ in range(3):
+        order = Order.objects.require(order_id)
+        if order.status != "paid":
+            raise HTTPException(409, f"Cannot ship an order that is {order.status}")
+        order.status = "shipped"
+        try:
+            return order.save()
+        except StaleDataError:
+            continue          # someone else moved it; re-read and re-check
+    raise HTTPException(409, "Order is being modified concurrently; retry")
+```
+
+`StaleDataError` is raised rather than retried automatically, because a retry re-runs
+whatever else was in your block. That is fine for a status flip and actively dangerous if
+the block also charged a card or sent an email. You decide.
+
+`.details["reason"]` distinguishes `version_conflict` (someone else wrote) from
+`row_deleted` (the record is gone).
+
+### Which to reach for
+
+| Situation | Use |
+|---|---|
+| Decrement stock, increment a counter, adjust a balance | `F(...)` + a guard |
+| Edit a record based on its current contents | `version_field` |
+| Multi-row invariant that must commit or fail as a unit | `db.transaction()` |
+| Money-critical inventory | all three |
+
+`F` and `version_field` compose: a versioned model still bumps its version on
+`update_where`, so a bulk update correctly invalidates any instance loaded beforehand.
+
+### What SQLite cannot give you
+
+SQLite serialises writers, which masks a lot of contention — the demonstrations above
+behave correctly on it. But it has no row-level locking, and `SELECT ... FOR UPDATE` is
+accepted and ignored. Load-test against the database you deploy on. The suite runs
+against PostgreSQL and MySQL in CI for this reason.
+
+### Rules of thumb
+
+- Never write a value you computed from a value you read. Use `F` or a version column.
+- Always check what `update_where` returns; an empty list is information.
+- Put multi-row invariants inside `db.transaction()`, not in compensation logic.
+- Reads inside a transaction see that transaction's uncommitted writes.
+
+---
+
 ## FastAPI Integration
 
 ### Lifespan Pattern
@@ -996,48 +1167,66 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 ```
 
-### `services/orders.py` — Write Invariants & Compensation
+### `services/orders.py` — Safe Inventory Writes
+
+This is the part most persistence guides get wrong. **Never compute a new value in
+Python from a value you just read.** Between the read and the write, another request
+can change the row, and your write silently discards theirs.
+
+```python
+# ❌ WRONG — lost update. Measured: 100 concurrent single-unit sales against
+#    stock=100 left 97 units on the shelf. 97 units sold that don't exist.
+product = Product.objects.require(pid)
+Product.objects.update_where({"id": pid}, stock=product.stock - qty)
+```
+
+Use `F(...)` so the database performs the arithmetic under its own row lock, and add a
+guard so an oversell updates zero rows instead of driving stock negative:
 
 ```python
 from fastapi import HTTPException
-from ..models import Order, Product
+from registers import F
+from ..models import Order, OrderItem, Product
 
 def create_order(customer_id: int, items: list[dict], now: str) -> Order:
-    snapshots: dict[int, Product] = {}
-    total = 0.0
-
-    for item in items:
-        product = Product.objects.require(item["product_id"])
-        if product.stock < item["quantity"]:
-            raise HTTPException(
-                status_code=409,
-                detail=f"Insufficient stock for product {product.id}"
-            )
-        snapshots[product.id] = product
-        total += product.price * item["quantity"]
-
-    created: Order | None = None
-    try:
-        created = Order.objects.create(
-            customer_id=customer_id,
-            total_amount=round(total, 2),
-            created_at=now,
-            updated_at=now,
+    with db.transaction():
+        order = Order.objects.create(
+            customer_id=customer_id, total_amount=0.0, created_at=now, updated_at=now
         )
+
+        total = 0.0
         for item in items:
-            product = snapshots[item["product_id"]]
-            Product.objects.update_where(
-                {"id": product.id},
-                stock=product.stock - item["quantity"]
+            pid, qty = item["product_id"], item["quantity"]
+
+            # Atomic conditional decrement. Empty result == insufficient stock.
+            reserved = Product.objects.update_where(
+                {"id": pid, "stock__gte": qty},
+                stock=F("stock") - qty,
             )
-        return created
-    except Exception as exc:
-        if created is not None:
-            Order.objects.delete(created.id)
-        for product_id, snapshot in snapshots.items():
-            Product.objects.update_where({"id": product_id}, stock=snapshot.stock)
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+            if not reserved:
+                # Raising rolls back the whole block, including the order row and
+                # any stock already reserved for earlier items. No compensation
+                # bookkeeping required — that is what the transaction is for.
+                raise HTTPException(409, f"Insufficient stock for product {pid}")
+
+            product = reserved[0]
+            total += product.price * qty
+            OrderItem.objects.create(order_id=order.id, product_id=pid, quantity=qty)
+
+        return Order.objects.update_where(
+            {"id": order.id}, total_amount=round(total, 2), updated_at=now
+        )[0]
 ```
+
+Two things carry the correctness here:
+
+- **`F("stock") - qty`** emits `SET stock = stock - :qty`. The value never round-trips
+  through Python, so there is no window in which it can go stale.
+- **`stock__gte=qty`** makes the update conditional. `update_where` returns the rows it
+  actually changed, so an empty list is your out-of-stock signal — check it.
+
+The transaction replaces the manual compensation logic entirely. If anything raises, every
+write in the block is rolled back together.
 
 ### Endpoint-to-Manager Mapping
 
@@ -1396,7 +1585,14 @@ count = await User.objects.count()
 fresh = await User.objects.require(user.id)
 ```
 
-The synchronous API remains the default. Async mode exposes an awaitable facade over the same manager behavior so validation, hooks, encryption, tenancy, and schema policy remain consistent.
+The synchronous API remains the default.
+
+> **What async mode actually is:** an awaitable facade that runs the synchronous manager
+> on a worker thread via `asyncio.to_thread`. It keeps calls from blocking the event loop
+> and preserves validation, hooks, encryption, tenancy, and schema policy — but the
+> driver underneath is still synchronous SQLAlchemy, so this is thread offloading rather
+> than native async I/O. For a genuinely async driver stack, use SQLAlchemy's
+> `AsyncEngine` directly.
 
 ## Timestamps And Hooks
 

@@ -7,12 +7,12 @@ Full migrations (Alembic) are out of scope for v1, but completely ad-hoc
 ``DROP + CREATE`` workflows are too destructive for production.  This module
 provides a middle ground:
 
-* ``create_schema()``   â€” CREATE TABLE IF NOT EXISTS  (always safe)
-* ``drop_schema()``     â€” DROP TABLE  (explicit, intentional)
-* ``truncate()``        â€” DELETE all rows  (no DDL)
-* ``schema_exists()``   â€” inspection only
-* ``add_column()``      â€” ADD COLUMN  (non-destructive, SQLite-safe)
-* ``rename_table()``    â€” RENAME TABLE  (SQLite-safe)
+* ``create_schema()``   — CREATE TABLE IF NOT EXISTS  (always safe)
+* ``drop_schema()``     — DROP TABLE  (explicit, intentional)
+* ``truncate()``        — DELETE all rows  (no DDL)
+* ``schema_exists()``   — inspection only
+* ``add_column()``      — ADD COLUMN  (non-destructive, SQLite-safe)
+* ``rename_table()``    — RENAME TABLE  (SQLite-safe)
 
 Limitations
 -----------
@@ -27,7 +27,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import logging
-import sqlite3
 from typing import Any, Mapping
 
 from sqlalchemy import (
@@ -199,7 +198,7 @@ class SchemaManager:
             ) from exc
 
     def drop_schema(self) -> None:
-        """DROP TABLE â€” irreversible. Caller is responsible for data safety."""
+        """DROP TABLE — irreversible. Caller is responsible for data safety."""
         try:
             self._table.metadata.drop_all(self._engine, tables=[self._table])
             logger.debug("Dropped schema for table '%s'.", self._table_name)
@@ -241,7 +240,7 @@ class SchemaManager:
         """
         Add *column_name* to the live table if it does not already exist.
 
-        This is an **additive** operation only â€” it never drops or modifies
+        This is an **additive** operation only — it never drops or modifies
         existing columns.  New columns are always nullable unless the
         database can supply a DEFAULT value (which you should pass via
         ``annotation``).
@@ -411,18 +410,4 @@ class SchemaManager:
             type_mismatches=type_mismatches,
         )
 
-    def sqlite_version_supports_drop_column(self) -> bool:
-        """
-        Return True when the runtime SQLite version supports DROP COLUMN
-        (requires SQLite â‰¥ 3.35.0, released 2021-03-12).
-        """
-        try:
-            with self._engine.connect() as conn:
-                row = conn.execute(text("SELECT sqlite_version()")).scalar()
-                if row:
-                    parts = [int(x) for x in str(row).split(".")]
-                    return (parts[0], parts[1], parts[2] if len(parts) > 2 else 0) >= (3, 35, 0)
-        except Exception:
-            pass
-        return False
 

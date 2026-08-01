@@ -13,7 +13,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-7C3AED?labelColor=111827\&style=for-the-badge)](LICENSE)
 [![SQLAlchemy](https://img.shields.io/badge/Powered%20by-SQLAlchemy-D97706?labelColor=111827\&style=for-the-badge)](https://www.sqlalchemy.org/)
 [![Pydantic](https://img.shields.io/badge/Pydantic-v2-E92063?labelColor=111827\&style=for-the-badge)](https://docs.pydantic.dev/)
-[![Tests](https://img.shields.io/badge/Tests-290%2B-2563EB?labelColor=111827\&style=for-the-badge)](#testing)
+[![Tests](https://img.shields.io/badge/Tests-675%2B-2563EB?labelColor=111827\&style=for-the-badge)](#testing)
 
 `registers.cli` · `registers.db` · `registers.cron` · `fx-tool`
 
@@ -92,7 +92,7 @@ Install Registers:
 pip install registers
 ```
 
-Install optional CLI shell features:
+Install aliasal CLI shell features:
 
 ```bash
 pip install "registers[cli]"
@@ -181,7 +181,7 @@ The example below creates a small todo application with:
 * an isolated database registry;
 * a Pydantic model persisted to SQLite;
 * commands for create/list/update/complete;
-* an optional interactive shell.
+* an aliasal interactive shell.
 
 ```python
 from __future__ import annotations
@@ -218,16 +218,16 @@ class TodoItem(BaseModel):
 @cli.register(name="add", description="Create a todo item")
 @cli.argument("title", type=str, help="Todo title")
 @cli.argument("description", type=str, default="", help="Todo description")
-@cli.option("--add")
-@cli.option("-a")
+@cli.alias("--add")
+@cli.alias("-a")
 def add_todo(title: str, description: str = "") -> str:
     todo = TodoItem.objects.create(title=title, description=description)
     return f"Added: {todo.title} (ID: {todo.id})"
 
 
 @cli.register(name="list", description="List todo items")
-@cli.option("--list")
-@cli.option("-l")
+@cli.alias("--list")
+@cli.alias("-l")
 def list_todos() -> str:
     todos = TodoItem.objects.all(order_by="id")
     if not todos:
@@ -237,8 +237,8 @@ def list_todos() -> str:
 
 @cli.register(name="complete", description="Mark a todo item as completed")
 @cli.argument("todo_id", type=int, help="Todo ID")
-@cli.option("--complete")
-@cli.option("-c")
+@cli.alias("--complete")
+@cli.alias("-c")
 def complete_todo(todo_id: int) -> str:
     todo = TodoItem.objects.require(todo_id)
     todo.status = TodoStatus.COMPLETED.value
@@ -251,8 +251,8 @@ def complete_todo(todo_id: int) -> str:
 @cli.argument("todo_id", type=int, help="Todo ID")
 @cli.argument("title", type=str, default=None, help="New title")
 @cli.argument("description", type=str, default=None, help="New description")
-@cli.option("--update")
-@cli.option("-u")
+@cli.alias("--update")
+@cli.alias("-u")
 def update_todo(
     todo_id: int,
     title: str | None = None,
@@ -650,7 +650,7 @@ These additions are intended to extend the current `fx-tool + cli + db + cron` a
 * Pydantic 2.x
 * SQLAlchemy 2.x
 
-Optional integrations depend on the modules you use:
+aliasal integrations depend on the modules you use:
 
 * FastAPI for API service examples;
 * Watchdog for file-change job triggers;

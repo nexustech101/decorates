@@ -39,6 +39,9 @@ class DatabaseContext:
     engine: Engine
     metadata: MetaData = field(default_factory=MetaData)
     tables: dict[str, Table] = field(default_factory=dict)
+    #: table name -> the model class that defined it, so a second model claiming
+    #: the same table is caught instead of silently inheriting the first's columns.
+    table_owners: dict[str, type] = field(default_factory=dict)
     lock: threading.RLock = field(default_factory=threading.RLock)
     disposed: bool = False
 
@@ -107,6 +110,11 @@ def dispose_engine(database_url: str) -> None:
 def dispose_all() -> None:
     """Dispose every cached engine. Call on application shutdown."""
     with _lock:
+        # Mark before clearing: managers hold a direct reference to their context,
+        # so a context dropped from the cache without ``disposed=True`` would let
+        # post-teardown operations proceed silently instead of raising.
+        for context in _contexts.values():
+            context.disposed = True
         _contexts.clear()
         urls = list(_engines.keys())
     for url in urls:

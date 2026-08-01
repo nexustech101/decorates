@@ -45,6 +45,7 @@ from registers.db.exceptions import (
     RegistryError,
     RelationshipError,
     SchemaError,
+    StaleDataError,
     UniqueConstraintError,
 )
 from registers.db.registry import DatabaseRegistry, audit_actor, tenant_scope, unscoped
@@ -52,7 +53,9 @@ from registers.db.query import Agg, Page, Q
 from registers.db.relations import BelongsTo, HasMany, HasManyThrough, ManyToMany, ManyToOne, OneToMany, prefetch
 from registers.db.schema import SchemaDiff, SchemaManager
 from registers.db.metadata import RegistryConfig
-from registers.db.fields import db_field
+from registers.db.adapters import DataclassAdapter, ModelAdapter, PydanticAdapter, adapter_for
+from registers.db.expressions import F
+from registers.db.fields import db_field, dc_field
 from registers.db.security import (
     PasswordHashPolicy,
     configure_password_policy,
@@ -67,6 +70,12 @@ __all__ = [
     "database_registry",
     "DatabaseRegistry",
     "db_field",
+    "F",
+    "dc_field",
+    "ModelAdapter",
+    "PydanticAdapter",
+    "DataclassAdapter",
+    "adapter_for",
     "hash_password",
     "is_password_hash",
     "verify_password",
@@ -107,6 +116,7 @@ __all__ = [
     "ConfigurationError",
     "ModelRegistrationError",
     "SchemaError",
+    "StaleDataError",
     "MigrationError",
     "RelationshipError",
     "DuplicateKeyError",

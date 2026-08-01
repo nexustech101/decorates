@@ -15,6 +15,7 @@ from sqlalchemy import inspect, text
 from conftest import db_url
 
 from registers.db import (
+    SchemaError,
     HasManyThrough,
     ImmutableFieldError,
     InvalidQueryError,
@@ -110,8 +111,17 @@ class TestDataIntegrityBoundaries:
         with Event.objects._engine.begin() as conn:
             conn.execute(text("INSERT INTO events (score) VALUES ('oops')"))
 
-        with pytest.raises(ValidationError):
+        # A row that no longer matches the model surfaces as a registry error, not
+        # as the model layer's own exception. Pydantic models used to leak
+        # ValidationError here while dataclass models raise FieldCoercionError, so
+        # callers had no single exception to handle; both are now wrapped, and the
+        # original is chained for diagnosis.
+        with pytest.raises(SchemaError) as excinfo:
             Event.objects.require(1)
+
+        assert excinfo.value.context["table"] == "events"
+        assert "validation_error" in excinfo.value.to_dict()["details"]
+        assert isinstance(excinfo.value.__cause__, ValidationError)
 
     def test_password_fields_are_hashed_when_explicitly_configured(self, tmp_path):
         @database_registry(db_url(tmp_path), table_name="accounts", key_field="id")

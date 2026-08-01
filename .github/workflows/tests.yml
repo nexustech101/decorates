@@ -1,0 +1,157 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Fast feedback: the SQLite suite across supported Python versions.
+  unit:
+    name: sqlite / py${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev,cli,pydantic]"
+
+      - name: Run test suite
+        run: pytest -q
+
+  # Registration and CRUD must also work with pydantic absent, since it is an
+  # optional dependency. A missing lazy import would only show up here.
+  no-pydantic:
+    name: dataclasses only (no pydantic)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install without the pydantic extra
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+          pip install pytest
+
+      - name: Confirm pydantic really is absent
+        run: |
+          python - <<'PY'
+          import importlib.util, sys
+          assert importlib.util.find_spec("pydantic") is None, "pydantic leaked into the env"
+          import registers
+          print("registers imports cleanly without pydantic")
+          PY
+
+      - name: Dataclass CRUD smoke test
+        run: |
+          python - <<'PY'
+          import tempfile
+          from dataclasses import dataclass
+          from registers import DatabaseRegistry, dc_field, F
+
+          db = DatabaseRegistry()
+          url = f"sqlite:///{tempfile.mkdtemp()}/ci.db"
+
+          @db.database_registry(url, table_name="items", unique_fields=["sku"])
+          @dataclass
+          class Item:
+              id: int | None = dc_field(id_strategy="autoincrement", default=None)
+              sku: str = ""
+              qty: int = 0
+
+          a = Item.objects.create(sku="A", qty=5)
+          Item.objects.update_where({"id": a.id, "qty__gte": 2}, qty=F("qty") - 2)
+          assert Item.objects.require(a.id).qty == 3
+          assert Item.objects.count() == 1
+          print("dataclass CRUD + F() OK without pydantic")
+          PY
+
+  # The behaviour that SQLite structurally cannot exercise: real row-level
+  # locking, MVCC, and genuine parallel writers.
+  integration:
+    name: ${{ matrix.backend }} integration
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - backend: postgres
+            url: postgresql+psycopg://registers:registers@127.0.0.1:54329/registers_test
+          - backend: mysql
+            url: mysql+pymysql://registers:registers@127.0.0.1:33069/registers_test
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev,cli,pydantic]"
+
+      # The conftest fixture brings these up itself, but starting them here
+      # surfaces image-pull and healthcheck failures as their own step rather
+      # than as an opaque test error.
+      - name: Start ${{ matrix.backend }}
+        run: docker compose -f docker-compose.test-db.yml up -d ${{ matrix.backend }}
+
+      - name: Wait for readiness
+        run: |
+          python - <<'PY'
+          import os, time
+          from sqlalchemy import create_engine, text
+          url = os.environ["DB_URL"]
+          for attempt in range(120):
+              try:
+                  engine = create_engine(url, future=True, pool_pre_ping=True)
+                  with engine.connect() as conn:
+                      conn.execute(text("SELECT 1"))
+                  engine.dispose()
+                  print(f"ready after {attempt}s")
+                  break
+              except Exception as exc:
+                  last = exc
+                  time.sleep(1)
+          else:
+              raise SystemExit(f"database never became ready: {last}")
+          PY
+        env:
+          DB_URL: ${{ matrix.url }}
+
+      - name: Run suite against ${{ matrix.backend }}
+        run: pytest -q
+        env:
+          REGISTERS_TEST_BACKEND: ${{ matrix.backend }}
+          REGISTERS_TEST_DB_URL: ${{ matrix.url }}
+
+      - name: Dump container logs on failure
+        if: failure()
+        run: docker compose -f docker-compose.test-db.yml logs --tail 200 ${{ matrix.backend }}
+
+      - name: Tear down
+        if: always()
+        run: docker compose -f docker-compose.test-db.yml down -v

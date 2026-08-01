@@ -12,7 +12,6 @@ from pathlib import Path
 from typing import Any, get_args, get_origin
 from uuid import UUID
 
-from pydantic import TypeAdapter
 from sqlalchemy import JSON, Boolean, Date, DateTime, Float, Integer, LargeBinary, Numeric, String
 from sqlalchemy.sql.type_api import TypeEngine
 
@@ -76,12 +75,21 @@ def annotation_is_uuid(annotation: Any) -> bool:
 
 
 def field_allows_none(field: Any) -> bool:
-    """Return True when the field's annotation includes NoneType."""
+    """
+    Return True when the field accepts ``None``.
+
+    Accepts anything exposing ``.annotation`` and ``.default`` — a Pydantic
+    ``FieldInfo`` or a ``registers.db.adapters.FieldView`` — so nullability is
+    determined the same way regardless of the model flavour.
+
+    A field is nullable if its annotation includes ``NoneType`` *or* it defaults to
+    ``None``. The second clause matters for bare ``x: int = None`` declarations.
+    """
     annotation = field.annotation
     origin = get_origin(annotation)
     if origin is not None and type(None) in get_args(annotation):
         return True
-    return field.default is None
+    return getattr(field, "default", None) is None
 
 
 # ---------------------------------------------------------------------------
@@ -136,40 +144,19 @@ def sqlalchemy_type_for_annotation(annotation: Any) -> TypeEngine[Any]:
     return JSON()
 
 
-def sqlalchemy_type_for_field(annotation: Any, metadata: dict[str, Any] | None = None) -> TypeEngine[Any]:
-    """Return the SQLAlchemy type for a model field, honoring db_field metadata."""
-    metadata = metadata or {}
-    explicit_type = metadata.get("db_column_type")
-    if explicit_type is not None:
-        if isinstance(explicit_type, TypeEngine):
-            return explicit_type
-        if isinstance(explicit_type, type) and issubclass(explicit_type, TypeEngine):
-            return explicit_type()
-        if callable(explicit_type):
-            resolved = explicit_type()
-            if isinstance(resolved, TypeEngine):
-                return resolved
-        raise TypeError("db_field(column_type=...) must be a SQLAlchemy TypeEngine, TypeEngine class, or factory.")
-
-    resolved = unwrap_annotation(annotation)
-    length = metadata.get("db_length")
-    precision = metadata.get("db_precision")
-    scale = metadata.get("db_scale")
-    timezone = metadata.get("db_timezone")
-
-    if resolved is str or (isinstance(resolved, type) and issubclass(resolved, str)):
-        return String(length or DEFAULT_VARCHAR_LENGTH)
-    if resolved is bytes or (isinstance(resolved, type) and issubclass(resolved, bytes)):
-        return LargeBinary(length)
-    if resolved is Decimal or (isinstance(resolved, type) and issubclass(resolved, Decimal)):
-        return Numeric(precision=precision, scale=scale)
-    if resolved is datetime or (isinstance(resolved, type) and issubclass(resolved, datetime)):
-        return DateTime(timezone=bool(timezone))
-
-    return sqlalchemy_type_for_annotation(annotation)
-
-
 def _json_schema_for(annotation: Any) -> dict[str, Any]:
+    """
+    Best-effort JSON-schema probe for exotic annotations.
+
+    Only reached for types the direct map does not cover. Pydantic is imported
+    lazily and its absence is not an error — without it these types simply fall
+    through to a JSON column, which is the same outcome an unrecognized schema
+    would produce.
+    """
+    try:
+        from pydantic import TypeAdapter
+    except ImportError:
+        return {}
     try:
         return TypeAdapter(annotation).json_schema()
     except Exception:

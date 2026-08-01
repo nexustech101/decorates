@@ -54,6 +54,11 @@ if TYPE_CHECKING:
 
 _PREFETCH_PREFIX = "__registers_prefetch_"
 
+#: Distinguishes "not prefetched" from "prefetched, and the answer was None".
+#: Without it, an optional BelongsTo whose FK is null re-queries on every access —
+#: exactly the N+1 that prefetch exists to remove.
+_NOT_PREFETCHED = object()
+
 
 def _prefetch_cache_name(name: str) -> str:
     return f"{_PREFETCH_PREFIX}{name}"
@@ -115,9 +120,10 @@ class _BaseRelationship:
         return None
 
     def _cached(self, obj: Any) -> Any:
+        """Return the prefetched value, or ``_NOT_PREFETCHED`` if there isn't one."""
         if self._attr_name == "<unbound>":
-            return None
-        return getattr(obj, _prefetch_cache_name(self._attr_name), None)
+            return _NOT_PREFETCHED
+        return getattr(obj, _prefetch_cache_name(self._attr_name), _NOT_PREFETCHED)
 
 
 # ---------------------------------------------------------------------------
@@ -166,16 +172,16 @@ class HasMany(_BaseRelationship):
         if obj is None:
             return self
         cached = self._cached(obj)
-        if cached is not None:
+        if cached is not _NOT_PREFETCHED:
             return cached
 
         manager = self._get_manager(self._related_model)
 
-        if self._foreign_key not in self._related_model.model_fields:
+        if self._foreign_key not in manager.adapter.fields():
             raise RelationshipError(
                 f"HasMany foreign_key '{self._foreign_key}' is not a field on "
                 f"'{self._related_model.__name__}'. "
-                f"Available fields: {list(self._related_model.model_fields.keys())}"
+                f"Available fields: {list(manager.adapter.fields())}"
             )
 
         # Determine the local primary key value
@@ -220,12 +226,12 @@ class BelongsTo(_BaseRelationship):
         if obj is None:
             return self
         cached = self._cached(obj)
-        if cached is not None:
+        if cached is not _NOT_PREFETCHED:
             return cached
 
         manager = self._get_manager(self._related_model)
 
-        local_fields = type(obj).model_fields
+        local_fields = self._get_manager(type(obj)).adapter.fields()
         if self._local_key not in local_fields:
             raise RelationshipError(
                 f"BelongsTo local_key '{self._local_key}' is not a field on "
@@ -292,14 +298,14 @@ class HasManyThrough(_BaseRelationship):
         if obj is None:
             return self
         cached = self._cached(obj)
-        if cached is not None:
+        if cached is not _NOT_PREFETCHED:
             return cached
 
         through_manager = self._get_manager(self._through)
         related_manager = self._get_manager(self._related_model)
 
         # Validate join-table fields
-        through_fields = self._through.model_fields
+        through_fields = through_manager.adapter.fields()
         for key_attr in (self._source_key, self._target_key):
             if key_attr not in through_fields:
                 raise RelationshipError(
@@ -346,11 +352,70 @@ class ManyToMany(HasManyThrough):
     """Explicit cardinality alias for :class:`HasManyThrough`."""
 
 
-def prefetch(records: list[Any] | tuple[Any, ...], relationship_name: str) -> list[Any] | tuple[Any, ...]:
-    """Batch-load a relationship descriptor for a collection of records."""
+def prefetch(
+    records: list[Any] | tuple[Any, ...],
+    *paths: str,
+) -> list[Any] | tuple[Any, ...]:
+    """
+    Batch-load relationships for a collection of records, avoiding N+1 queries.
+
+    Accepts one or more paths. A path may be a single relationship name, or a
+    nested chain joined by ``__``, which is where the real savings are::
+
+        orders = Order.objects.filter(status="paid", limit=50)
+        prefetch(orders, "items__product", "customer")
+
+        for order in orders:
+            order.customer.name              # already loaded
+            for item in order.items:
+                item.product.name            # already loaded
+
+    Without this, rendering 50 orders with 5 items each costs 1 + 50 + 250 queries.
+    With it, the same page costs 4 — one per level, regardless of row count. Each
+    level is loaded for *every* record at that level at once, using a single
+    ``field__in=[...]`` lookup.
+
+    Cycles are not followed; a path is walked exactly as written.
+    """
     if not records:
         return records
+    for path in paths:
+        _prefetch_path(list(records), path)
+    return records
 
+
+def _prefetch_path(records: list[Any], path: str) -> None:
+    """
+    Walk one ``a__b__c`` path, loading each level in a single batched query.
+
+    After loading a level, the records for the *next* level are gathered from the
+    caches just populated — so depth costs one query per segment, not per row.
+    """
+    level: list[Any] = [record for record in records if record is not None]
+    for segment in path.split("__"):
+        if not level:
+            return
+        _prefetch_one(level, segment)
+        level = _collect_next_level(level, segment)
+
+
+def _collect_next_level(records: list[Any], name: str) -> list[Any]:
+    """Flatten the just-prefetched values into the record list for the next hop."""
+    collected: list[Any] = []
+    seen: set[int] = set()
+    for record in records:
+        value = getattr(record, _prefetch_cache_name(name), None)
+        candidates = value if isinstance(value, list) else [value]
+        for candidate in candidates:
+            if candidate is None or id(candidate) in seen:
+                continue
+            seen.add(id(candidate))
+            collected.append(candidate)
+    return collected
+
+
+def _prefetch_one(records: list[Any], relationship_name: str) -> None:
+    """Load a single relationship level for every record in *records*."""
     owner = type(records[0])
     relationship = getattr(owner, relationship_name, None)
     if not isinstance(relationship, _BaseRelationship):
@@ -367,7 +432,6 @@ def prefetch(records: list[Any] | tuple[Any, ...], relationship_name: str) -> li
         _prefetch_belongs_to(records, relationship_name, relationship)
     else:  # pragma: no cover - defensive for future relationship types
         raise RelationshipError(f"Unsupported relationship type for '{relationship_name}'.")
-    return records
 
 
 def _prefetch_has_many(
